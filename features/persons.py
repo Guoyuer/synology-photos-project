@@ -4,7 +4,7 @@ import json
 
 
 def list_persons(photos, limit=None):
-    """List all persons (people)."""
+    """List all persons (people) with photo counts."""
     try:
         persons = photos.session.request_data(
             api_name="SYNO.Foto.Browse.Person",
@@ -37,7 +37,8 @@ def list_persons(photos, limit=None):
         for person in person_list[:display_count]:
             name = person.get('name', '(Unknown)')
             person_id = person.get('id', 'N/A')
-            print(f"  - {name} (ID: {person_id})")
+            item_count = person.get('item_count', 0)
+            print(f"  - {name} (ID: {person_id}, Photos: {item_count})")
 
         if limit and len(person_list) > limit:
             print(f"  ... and {len(person_list) - limit} more")

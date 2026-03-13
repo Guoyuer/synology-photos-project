@@ -58,13 +58,22 @@ python cli.py items --folder 166            # List all items in folder 166
 python cli.py items --folder 166 --limit 20 # List 20 items
 ```
 
-### `cli.py persons [--limit N]`
-List all persons (people) detected in photos.
+### `cli.py persons [--person-id ID] [--photos] [--limit N] [--download] [--output DIR]`
+List all persons or show photos of a specific person.
 
 ```bash
-python cli.py persons                       # List all persons
-python cli.py persons --limit 20            # List first 20 persons
+python cli.py persons                            # List all persons
+python cli.py persons --limit 20                 # List first 20 persons
+python cli.py persons --person-id 88 --photos    # List photos of person 88
+python cli.py persons --person-id 88 --photos --limit 10   # List 10 photos
+python cli.py persons --person-id 88 --photos --download   # Download (when available)
+python cli.py persons --person-id 88 --photos --output ./my_photos  # Custom output dir
 ```
+
+**Status:**
+- ✅ List persons: Works
+- ✅ List photos by person: Works
+- ⚠️ Download photos: Requires API authentication fix (see DOWNLOAD_FEATURE.md)
 
 ### `cli.py all`
 Show comprehensive overview (user, albums, folders, persons).

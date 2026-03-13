@@ -7,7 +7,7 @@ import argparse
 from dotenv import load_dotenv
 
 from session_manager import get_photos_api
-from features import user, albums, folders, items, persons
+from features import user, albums, folders, items, persons, download
 
 # Load environment variables
 load_dotenv()
@@ -88,7 +88,18 @@ def cmd_persons(args):
     """Handle persons command."""
     config = get_config()
     photos = get_photos_instance(config)
-    persons.list_persons(photos, limit=args.limit)
+
+    # If person_id is provided, show photos for that person
+    if args.person_id:
+        if args.photos:
+            download.list_person_photos(photos, args.person_id, None, limit=args.limit)
+            if args.download:
+                download.download_person_photos(photos, args.person_id, args.output, args.limit, None)
+        else:
+            print(f"Use --photos flag to list/download photos for person {args.person_id}")
+    else:
+        # List all persons
+        persons.list_persons(photos, limit=args.limit)
 
 
 def cmd_all(args):
@@ -111,16 +122,19 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  %(prog)s user                    # Get user info
-  %(prog)s albums                  # List all albums
-  %(prog)s albums --limit 10       # List first 10 albums
-  %(prog)s folders                 # List all folders
-  %(prog)s folders --id 3          # Get details for folder ID 3
-  %(prog)s items --folder 166      # List items in folder ID 166
-  %(prog)s items --folder 166 --limit 20  # List 20 items
-  %(prog)s persons                 # List all persons
-  %(prog)s persons --limit 20      # List first 20 persons
-  %(prog)s all                     # Show everything (user, albums, folders, persons)
+  %(prog)s user                          # Get user info
+  %(prog)s albums                        # List all albums
+  %(prog)s albums --limit 10             # List first 10 albums
+  %(prog)s folders                       # List all folders
+  %(prog)s folders --id 3                # Get details for folder ID 3
+  %(prog)s items --folder 166            # List items in folder ID 166
+  %(prog)s items --folder 166 --limit 20 # List 20 items
+  %(prog)s persons                       # List all persons
+  %(prog)s persons --limit 20            # List first 20 persons
+  %(prog)s persons --person-id 88 --photos        # List photos of person 88
+  %(prog)s persons --person-id 88 --photos --limit 10   # List 10 photos
+  %(prog)s persons --person-id 88 --photos --download   # Download (when ready)
+  %(prog)s all                           # Show everything
         """
     )
 
@@ -144,8 +158,12 @@ Examples:
     items_parser.add_argument('--limit', type=int, help='Limit number of results')
 
     # Persons command
-    persons_parser = subparsers.add_parser('persons', help='List persons')
+    persons_parser = subparsers.add_parser('persons', help='List persons or manage photos of a person')
     persons_parser.add_argument('--limit', type=int, help='Limit number of results')
+    persons_parser.add_argument('--person-id', type=int, help='Person ID to show photos for')
+    persons_parser.add_argument('--photos', action='store_true', help='Show photos for --person-id')
+    persons_parser.add_argument('--download', action='store_true', help='Download photos (requires --photos)')
+    persons_parser.add_argument('--output', type=str, default='downloads', help='Output directory for downloads')
 
     # All command
     subparsers.add_parser('all', help='Show all information')

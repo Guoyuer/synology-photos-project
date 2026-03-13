@@ -34,21 +34,36 @@ A Python project for interacting with Synology Photos API.
 
 ### Usage
 
-Run the example script:
+Use the CLI tool:
 ```bash
 source venv/bin/activate
-python3 example.py
+python cli.py --help
+python cli.py user
+python cli.py persons --limit 20
+python cli.py download --person-id 88 --list
 ```
+
+See [README_CLI.md](README_CLI.md) for full CLI documentation.
 
 ### Project Structure
 ```
 synology-photos-project/
+├── cli.py                   # Main CLI entry point
+├── session_manager.py       # Session persistence
+├── manage_session.py        # Session utilities
+├── features/                # Modular features
+│   ├── user.py
+│   ├── albums.py
+│   ├── folders.py
+│   ├── items.py
+│   ├── persons.py
+│   └── download.py
 ├── venv/                    # Virtual environment
 ├── .env                     # Configuration (local, not in git)
 ├── .env.example             # Example configuration
-├── .gitignore               # Git ignore rules
 ├── requirements.txt         # Python dependencies
-├── example.py               # Example usage script
+├── README_CLI.md            # CLI documentation
+├── DOWNLOAD_FEATURE.md      # Download feature status
 └── README.md                # This file
 ```
 
