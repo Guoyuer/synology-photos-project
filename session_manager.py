@@ -1,7 +1,6 @@
 """Session manager for persistent Synology Photos API login."""
 
 import json
-import os
 from pathlib import Path
 from datetime import datetime, timedelta
 from synology_api.photos import Photos

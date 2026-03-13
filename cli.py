@@ -6,7 +6,7 @@ import sys
 import argparse
 from dotenv import load_dotenv
 
-from session_manager import get_photos_api
+from session_manager import get_photos_api, clear_session
 from features import user, albums, folders, items, persons, download
 
 # Load environment variables
@@ -75,10 +75,6 @@ def cmd_folders(args):
 
 def cmd_items(args):
     """Handle items command."""
-    if not args.folder:
-        print("❌ Error: --folder is required")
-        sys.exit(1)
-
     config = get_config()
     photos = get_photos_instance(config)
     items.list_items_in_folder(photos, args.folder, limit=args.limit)
@@ -92,14 +88,13 @@ def cmd_persons(args):
     # If person_id is provided, show photos for that person
     if args.person_id:
         if args.photos:
-            download.list_person_photos(photos, args.person_id, None, limit=args.limit)
+            download.list_person_photos(photos, args.person_id, limit=args.limit)
             if args.download:
                 download.download_person_photos(
                     photos,
                     args.person_id,
                     args.output,
                     args.limit,
-                    None,
                     nas_ip=config['nas_ip'],
                     nas_port=config['nas_port'],
                     nas_secure=config['nas_secure'],
@@ -110,6 +105,15 @@ def cmd_persons(args):
     else:
         # List all persons
         persons.list_persons(photos, limit=args.limit)
+
+
+def cmd_session(args):
+    """Handle session command."""
+    if args.action == 'clear':
+        clear_session()
+    elif args.action == 'status':
+        from manage_session import show_status
+        show_status()
 
 
 def cmd_all(args):
@@ -143,7 +147,9 @@ Examples:
   %(prog)s persons --limit 20            # List first 20 persons
   %(prog)s persons --person-id 88 --photos        # List photos of person 88
   %(prog)s persons --person-id 88 --photos --limit 10   # List 10 photos
-  %(prog)s persons --person-id 88 --photos --download   # Download (when ready)
+  %(prog)s persons --person-id 88 --photos --download   # Download photos
+  %(prog)s session status                # Show session info
+  %(prog)s session clear                 # Clear saved session
   %(prog)s all                           # Show everything
         """
     )
@@ -175,6 +181,10 @@ Examples:
     persons_parser.add_argument('--download', action='store_true', help='Download photos (requires --photos)')
     persons_parser.add_argument('--output', type=str, default='downloads', help='Output directory for downloads')
 
+    # Session command
+    session_parser = subparsers.add_parser('session', help='Manage login session')
+    session_parser.add_argument('action', choices=['status', 'clear'], help='Session action')
+
     # All command
     subparsers.add_parser('all', help='Show all information')
 
@@ -191,6 +201,7 @@ Examples:
         'folders': cmd_folders,
         'items': cmd_items,
         'persons': cmd_persons,
+        'session': cmd_session,
         'all': cmd_all,
     }
 

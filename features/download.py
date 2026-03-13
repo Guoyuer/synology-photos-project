@@ -40,10 +40,9 @@ def get_person_photos(photos, person_id, limit=None):
         return []
 
 
-def list_person_photos(photos, person_id, person_name=None, limit=None):
+def list_person_photos(photos, person_id, limit=None):
     """List all photos containing a specific person."""
-    name_str = f" ({person_name})" if person_name else ""
-    print(f"\n=== Photos of Person {person_id}{name_str} ===")
+    print(f"\n=== Photos of Person {person_id} ===")
 
     items = get_person_photos(photos, person_id, limit)
 
@@ -60,7 +59,7 @@ def list_person_photos(photos, person_id, person_name=None, limit=None):
     return True
 
 
-def download_person_photos(photos, person_id, output_dir="downloads", limit=None, person_name=None, nas_ip=None, nas_port=None, nas_secure=False, nas_cert_verify=False):
+def download_person_photos(photos, person_id, output_dir="downloads", limit=None, nas_ip=None, nas_port=None, nas_secure=False, nas_cert_verify=False):
     """
     Download all photos of a specific person.
 
@@ -69,14 +68,12 @@ def download_person_photos(photos, person_id, output_dir="downloads", limit=None
         person_id: Person ID to download photos for
         output_dir: Directory to save photos
         limit: Max number of photos to download
-        person_name: Person name for display
         nas_ip: NAS IP address
         nas_port: NAS port
         nas_secure: Use HTTPS
         nas_cert_verify: Verify SSL cert
     """
-    name_str = f" ({person_name})" if person_name else ""
-    print(f"\n=== Downloading Photos of Person {person_id}{name_str} ===")
+    print(f"\n=== Downloading Photos of Person {person_id} ===")
 
     items = get_person_photos(photos, person_id, limit)
 
