@@ -94,7 +94,17 @@ def cmd_persons(args):
         if args.photos:
             download.list_person_photos(photos, args.person_id, None, limit=args.limit)
             if args.download:
-                download.download_person_photos(photos, args.person_id, args.output, args.limit, None)
+                download.download_person_photos(
+                    photos,
+                    args.person_id,
+                    args.output,
+                    args.limit,
+                    None,
+                    nas_ip=config['nas_ip'],
+                    nas_port=config['nas_port'],
+                    nas_secure=config['nas_secure'],
+                    nas_cert_verify=config['nas_cert_verify']
+                )
         else:
             print(f"Use --photos flag to list/download photos for person {args.person_id}")
     else:

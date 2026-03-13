@@ -1,8 +1,8 @@
 """Download feature for photos by person."""
 
 import json
-import os
 from pathlib import Path
+import requests
 
 
 def get_person_photos(photos, person_id, limit=None):
@@ -60,15 +60,20 @@ def list_person_photos(photos, person_id, person_name=None, limit=None):
     return True
 
 
-def download_person_photos(photos, person_id, output_dir="downloads", limit=None, person_name=None):
+def download_person_photos(photos, person_id, output_dir="downloads", limit=None, person_name=None, nas_ip=None, nas_port=None, nas_secure=False, nas_cert_verify=False):
     """
     Download all photos of a specific person.
 
-    NOTE: Direct download via SYNO.Foto.Download API requires additional authentication
-    or parameters not yet documented in synology-api library.
-
-    This is a placeholder for future implementation.
-    See: https://github.com/zeichensatz/SynologyPhotosAPI
+    Args:
+        photos: Photos API instance
+        person_id: Person ID to download photos for
+        output_dir: Directory to save photos
+        limit: Max number of photos to download
+        person_name: Person name for display
+        nas_ip: NAS IP address
+        nas_port: NAS port
+        nas_secure: Use HTTPS
+        nas_cert_verify: Verify SSL cert
     """
     name_str = f" ({person_name})" if person_name else ""
     print(f"\n=== Downloading Photos of Person {person_id}{name_str} ===")
@@ -82,33 +87,85 @@ def download_person_photos(photos, person_id, output_dir="downloads", limit=None
     # Create output directory
     Path(output_dir).mkdir(exist_ok=True)
 
-    print(f"\n⚠️  Download feature requires additional implementation:")
-    print(f"   - {len(items)} photos available for download")
-    print(f"   - API endpoint: SYNO.Foto.Download")
-    print(f"   - Status: Requires authentication headers/parameters not yet supported")
-    print(f"\nPhotos ready for download:")
+    print(f"Downloading {len(items)} photos to {output_dir}/\n")
+
+    # Get auth tokens from session
+    syno_token = photos.session.syno_token
+    sid = photos.session.sid
+
+    success_count = 0
+    failed_count = 0
 
     for i, item in enumerate(items, 1):
         filename = item.get('filename', 'Unknown')
-        item_id = item.get('id', 'N/A')
-        print(f"  {i}. {filename} (ID: {item_id})")
+        item_id = item.get('id')
 
-    return False
+        # Download the photo
+        if download_item(
+            item_id=item_id,
+            filename=filename,
+            output_dir=output_dir,
+            syno_token=syno_token,
+            sid=sid,
+            nas_ip=nas_ip,
+            nas_port=nas_port,
+            nas_secure=nas_secure,
+            nas_cert_verify=nas_cert_verify
+        ):
+            print(f"  ✅ {i}/{len(items)} {filename}")
+            success_count += 1
+        else:
+            print(f"  ❌ {i}/{len(items)} {filename}")
+            failed_count += 1
+
+    print(f"\n✅ Downloaded: {success_count}")
+    if failed_count > 0:
+        print(f"❌ Failed: {failed_count}")
+
+    return success_count > 0
 
 
-def get_download_url(nas_ip, nas_port, item_id, cache_key=None, nas_secure=False):
-    """
-    Generate a download URL for a photo.
+def download_item(item_id, filename, output_dir, syno_token, sid, nas_ip, nas_port, nas_secure=False, nas_cert_verify=False):
+    """Download a single original photo."""
+    try:
+        protocol = "https" if nas_secure else "http"
+        url = f"{protocol}://{nas_ip}:{nas_port}/webapi/entry.cgi"
 
-    WARNING: Direct URLs may require authentication headers.
-    Use with session management.
-    """
-    protocol = "https" if nas_secure else "http"
-    base_url = f"{protocol}://{nas_ip}:{nas_port}/photo/webapi/entry.cgi"
+        # SynoToken in query string (CSRF token)
+        params = {'SynoToken': syno_token}
 
-    if cache_key:
-        url = f"{base_url}?api=SYNO.Foto.Download&method=download&version=1&cache_key={cache_key}&unit_id={item_id}"
-    else:
-        url = f"{base_url}?api=SYNO.Foto.Download&method=download&version=1&id={item_id}"
+        # Form data with _sid for authentication
+        data = {
+            'api': 'SYNO.Foto.Download',
+            'method': 'download',
+            'version': '2',
+            'item_id': json.dumps([item_id]),
+            'download_type': 'source',
+            'force_download': 'true',
+            '_sid': sid,
+        }
 
-    return url
+        response = requests.post(
+            url,
+            params=params,
+            data=data,
+            verify=nas_cert_verify,
+            stream=True,
+            timeout=60,
+        )
+
+        content_type = response.headers.get('Content-Type', '')
+        if response.status_code == 200 and 'json' not in content_type:
+            output_path = Path(output_dir) / filename
+            with open(output_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+            return True
+
+        return False
+
+    except Exception:
+        return False
+
+
