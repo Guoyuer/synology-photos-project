@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from datetime import datetime, timedelta
 from synology_api.photos import Photos
+from synology_api import base_api
 
 
 SESSION_FILE = Path.home() / '.synology_photos_session'
@@ -81,22 +82,21 @@ def get_photos_api(nas_ip, nas_port, nas_username, nas_password,
     if use_cache:
         cached_session = load_session_from_file()
 
-    # Create Photos object
-    photos = Photos(
-        ip_address=nas_ip,
-        port=nas_port,
-        username=nas_username,
-        password=nas_password,
-        secure=nas_secure,
-        cert_verify=nas_cert_verify,
-        dsm_version=nas_dsm_version,
-        debug=True,
-        otp_code=nas_otp
-    )
-
     # Try to use cached session if not expired
     if cached_session and not is_session_expired(cached_session):
         try:
+            photos = Photos(
+                ip_address=nas_ip,
+                port=nas_port,
+                username=nas_username,
+                password=nas_password,
+                secure=nas_secure,
+                cert_verify=nas_cert_verify,
+                dsm_version=nas_dsm_version,
+                debug=True,
+                otp_code=nas_otp
+            )
+
             photos.session._sid = cached_session['sid']
             photos.session._syno_token = cached_session['syno_token']
 
@@ -109,11 +109,23 @@ def get_photos_api(nas_ip, nas_port, nas_username, nas_password,
                 return photos, True  # Return True for cached
         except Exception as e:
             print(f"Cached session invalid: {e}")
-            # Fall through to login again
+            clear_session()
+            # Force next Photos() to perform a real login (see doc below)
+            base_api.BaseApi.shared_session = None
 
-    # Session doesn't exist, is expired, or is invalid, login fresh
+    # Session doesn't exist, is expired, or is invalid, login fresh.
     print("Logging in with credentials...")
-    # Photos object already logged in during __init__
+    photos = Photos(
+        ip_address=nas_ip,
+        port=nas_port,
+        username=nas_username,
+        password=nas_password,
+        secure=nas_secure,
+        cert_verify=nas_cert_verify,
+        dsm_version=nas_dsm_version,
+        debug=True,
+        otp_code=nas_otp
+    )
     save_session(photos, is_new=True)
     return photos, False  # Return False for fresh login
 
