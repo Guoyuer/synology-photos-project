@@ -7,13 +7,7 @@
  */
 import { useMemo, useCallback, useState } from 'react'
 import type { MediaItem } from '../types'
-import { computeBins, type Bin, type Granularity } from './timelineBins'
-
-interface DrillLevel {
-  gran: Granularity
-  filterRange: { from: string; to: string }
-  label: string // e.g. "2023" or "2023 Q2"
-}
+import { computeBins, handleBinClick, handleBinBack, type DrillLevel } from './timelineBins'
 
 interface Props {
   items: MediaItem[]
@@ -36,44 +30,20 @@ export function TimelineBar({ items, onDateFilter, onClearDateFilter, onScrollTo
     return computeBins(items, topGran ?? undefined)
   }, [items, currentDrill, topGran])
 
-  const handleClick = useCallback((bin: Bin) => {
-    if (gran === 'year') {
-      setDrillStack(prev => [...prev, {
-        gran: 'quarter',
-        filterRange: { from: bin.fromDate, to: bin.toDate },
-        label: bin.label,
-      }])
-    } else if (gran === 'quarter') {
-      setDrillStack(prev => [...prev, {
-        gran: 'month',
-        filterRange: { from: bin.fromDate, to: bin.toDate },
-        label: bin.label,
-      }])
-    } else {
-      // Month level — set date filter and scroll
-      onDateFilter(bin.fromDate, bin.toDate)
-      onScrollTo(bin._firstIndex)
-    }
-  }, [gran, onDateFilter, onScrollTo])
+  const handleClick = useCallback((bin: ReturnType<typeof computeBins>['bins'][number]) => {
+    const { newDrillStack, dateFilter, scrollTo } = handleBinClick(gran, bin, drillStack)
+    setDrillStack(newDrillStack)
+    onDateFilter(dateFilter.from, dateFilter.to)
+    if (scrollTo !== null) onScrollTo(scrollTo)
+  }, [gran, drillStack, onDateFilter, onScrollTo])
 
   const handleBack = useCallback(() => {
-    if (drillStack.length > 0) {
-      const newStack = drillStack.slice(0, -1)
-      setDrillStack(newStack)
-      if (newStack.length > 0) {
-        // Expand date filter to parent drill range
-        const parent = newStack[newStack.length - 1]
-        onDateFilter(parent.filterRange.from, parent.filterRange.to)
-      } else {
-        onClearDateFilter()
-      }
-    } else {
-      // At top level — zoom out to coarser granularity and clear date filter
-      onClearDateFilter()
-      if (gran === 'month') setTopGran('quarter')
-      else if (gran === 'quarter') setTopGran(null) // 'year' is default
-    }
-  }, [drillStack, gran, onDateFilter, onClearDateFilter])
+    const { newDrillStack, newTopGran, dateFilter } = handleBinBack(gran, drillStack, topGran)
+    setDrillStack(newDrillStack)
+    setTopGran(newTopGran)
+    if (dateFilter) onDateFilter(dateFilter.from, dateFilter.to)
+    else onClearDateFilter()
+  }, [gran, drillStack, topGran, onDateFilter, onClearDateFilter])
 
   const canGoBack = drillStack.length > 0 || gran !== 'year'
 

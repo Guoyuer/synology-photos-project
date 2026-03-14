@@ -118,3 +118,70 @@ function dateToUnix(ymd: string): number {
   const [y, m, d] = ymd.split('-').map(Number)
   return Date.UTC(y, m - 1, d) / 1000
 }
+
+// ---------------------------------------------------------------------------
+// Interaction logic — pure functions for click and back, testable without React
+// ---------------------------------------------------------------------------
+
+export interface DrillLevel {
+  gran: Granularity
+  filterRange: { from: string; to: string }
+  label: string
+}
+
+export interface ClickResult {
+  newDrillStack: DrillLevel[]
+  dateFilter: { from: string; to: string }  // always set — every click narrows the filter
+  scrollTo: number | null                   // only set at month level
+}
+
+/**
+ * What happens when the user clicks a bin.
+ * Year → drills to quarters (sets date filter to year range).
+ * Quarter → drills to months (sets date filter to quarter range).
+ * Month → leaf: sets date filter + scrollTo.
+ */
+export function handleBinClick(gran: Granularity, bin: Bin, drillStack: DrillLevel[]): ClickResult {
+  const dateFilter = { from: bin.fromDate, to: bin.toDate }
+  if (gran === 'year') {
+    return {
+      newDrillStack: [...drillStack, { gran: 'quarter', filterRange: dateFilter, label: bin.label }],
+      dateFilter,
+      scrollTo: null,
+    }
+  }
+  if (gran === 'quarter') {
+    return {
+      newDrillStack: [...drillStack, { gran: 'month', filterRange: dateFilter, label: bin.label }],
+      dateFilter,
+      scrollTo: null,
+    }
+  }
+  // month — leaf level
+  return { newDrillStack: drillStack, dateFilter, scrollTo: bin._firstIndex }
+}
+
+export interface BackResult {
+  newDrillStack: DrillLevel[]
+  newTopGran: Granularity | null
+  dateFilter: { from: string; to: string } | null  // null = clear
+}
+
+/**
+ * What happens when the user clicks Back.
+ * If drilled down: pop one level, expand filter to parent range (or clear if now at root).
+ * If at auto top-level: zoom out to coarser granularity and clear filter.
+ */
+export function handleBinBack(gran: Granularity, drillStack: DrillLevel[], topGran: Granularity | null): BackResult {
+  if (drillStack.length > 0) {
+    const newStack = drillStack.slice(0, -1)
+    if (newStack.length > 0) {
+      const parent = newStack[newStack.length - 1]
+      return { newDrillStack: newStack, newTopGran: topGran, dateFilter: { from: parent.filterRange.from, to: parent.filterRange.to } }
+    }
+    return { newDrillStack: newStack, newTopGran: topGran, dateFilter: null }
+  }
+  // At forced/auto top level — zoom out one notch
+  const newTopGran = gran === 'month' ? 'quarter' : null
+  return { newDrillStack: [], newTopGran, dateFilter: null }
+}

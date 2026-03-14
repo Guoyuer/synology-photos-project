@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { granularity, binKey, binRange, computeBins } from '../timelineBins'
+import { granularity, binKey, binRange, computeBins, handleBinClick, handleBinBack, type DrillLevel, type Granularity } from '../timelineBins'
 
 describe('granularity', () => {
   it('returns year for >3 year span', () => {
@@ -201,5 +201,93 @@ describe('computeBins', () => {
       expect(janBin).toBeDefined()
       expect(janBin!._firstIndex).toBe(3)
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// handleBinClick — clicking a bin should ALWAYS set the date filter
+// ---------------------------------------------------------------------------
+
+describe('handleBinClick', () => {
+  const yearBin  = { label: '2024', fromDate: '2024-01-01', toDate: '2024-12-31', count: 10, _firstIndex: 0 }
+  const qBin     = { label: '2024 Q3', fromDate: '2024-07-01', toDate: '2024-09-30', count: 5, _firstIndex: 3 }
+  const monthBin = { label: 'Aug 24', fromDate: '2024-08-01', toDate: '2024-08-31', count: 2, _firstIndex: 7 }
+  const emptyStack: DrillLevel[] = []
+
+  it('clicking a year bin sets dateFilter to year range', () => {
+    const r = handleBinClick('year', yearBin, emptyStack)
+    expect(r.dateFilter).toEqual({ from: '2024-01-01', to: '2024-12-31' })
+  })
+
+  it('clicking a year bin pushes quarter drill onto stack', () => {
+    const r = handleBinClick('year', yearBin, emptyStack)
+    expect(r.newDrillStack).toHaveLength(1)
+    expect(r.newDrillStack[0].gran).toBe('quarter')
+    expect(r.newDrillStack[0].filterRange).toEqual({ from: '2024-01-01', to: '2024-12-31' })
+  })
+
+  it('clicking a year bin does NOT scroll (scrollTo is null)', () => {
+    const r = handleBinClick('year', yearBin, emptyStack)
+    expect(r.scrollTo).toBeNull()
+  })
+
+  it('clicking a quarter bin sets dateFilter to quarter range', () => {
+    const stack: DrillLevel[] = [{ gran: 'quarter', filterRange: { from: '2024-01-01', to: '2024-12-31' }, label: '2024' }]
+    const r = handleBinClick('quarter', qBin, stack)
+    expect(r.dateFilter).toEqual({ from: '2024-07-01', to: '2024-09-30' })
+  })
+
+  it('clicking a quarter bin pushes month drill and keeps parent on stack', () => {
+    const stack: DrillLevel[] = [{ gran: 'quarter', filterRange: { from: '2024-01-01', to: '2024-12-31' }, label: '2024' }]
+    const r = handleBinClick('quarter', qBin, stack)
+    expect(r.newDrillStack).toHaveLength(2)
+    expect(r.newDrillStack[1].gran).toBe('month')
+    expect(r.scrollTo).toBeNull()
+  })
+
+  it('clicking a month bin sets dateFilter and scrollTo', () => {
+    const r = handleBinClick('month', monthBin, emptyStack)
+    expect(r.dateFilter).toEqual({ from: '2024-08-01', to: '2024-08-31' })
+    expect(r.scrollTo).toBe(7)
+    expect(r.newDrillStack).toHaveLength(0)  // stack unchanged at leaf
+  })
+})
+
+// ---------------------------------------------------------------------------
+// handleBinBack — back should expand (or clear) the date filter
+// ---------------------------------------------------------------------------
+
+describe('handleBinBack', () => {
+  const yearDrill:    DrillLevel = { gran: 'quarter' as Granularity, filterRange: { from: '2024-01-01', to: '2024-12-31' }, label: '2024' }
+  const quarterDrill: DrillLevel = { gran: 'month'   as Granularity, filterRange: { from: '2024-07-01', to: '2024-09-30' }, label: '2024 Q3' }
+
+  it('back from month-drill restores parent quarter dateFilter', () => {
+    const r = handleBinBack('month', [yearDrill, quarterDrill], null)
+    expect(r.newDrillStack).toHaveLength(1)
+    expect(r.dateFilter).toEqual({ from: '2024-01-01', to: '2024-12-31' })
+  })
+
+  it('back from single quarter-drill clears dateFilter (back to top)', () => {
+    const r = handleBinBack('quarter', [yearDrill], null)
+    expect(r.newDrillStack).toHaveLength(0)
+    expect(r.dateFilter).toBeNull()
+  })
+
+  it('back from auto top-level month clears filter and zooms to quarter', () => {
+    const r = handleBinBack('month', [], null)
+    expect(r.newTopGran).toBe('quarter')
+    expect(r.newDrillStack).toHaveLength(0)
+    expect(r.dateFilter).toBeNull()
+  })
+
+  it('back from auto top-level quarter clears filter and zooms to year', () => {
+    const r = handleBinBack('quarter', [], 'quarter' as Granularity)
+    expect(r.newTopGran).toBeNull()
+    expect(r.dateFilter).toBeNull()
+  })
+
+  it('back preserves topGran when popping a drill level', () => {
+    const r = handleBinBack('month', [yearDrill, quarterDrill], 'quarter' as Granularity)
+    expect(r.newTopGran).toBe('quarter')  // topGran unchanged when popping drill
   })
 })
