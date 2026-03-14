@@ -2,6 +2,8 @@
 
 import os
 import sys
+import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -11,6 +13,7 @@ import mimetypes
 import orjson
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
@@ -35,14 +38,44 @@ app.add_middleware(
 )
 
 
+_db_pool = psycopg2.pool.SimpleConnectionPool(
+    minconn=1, maxconn=4,
+    host=os.getenv("NAS_DB_HOST", "192.168.1.169"),
+    port=int(os.getenv("NAS_DB_PORT", "5432")),
+    dbname=os.getenv("NAS_DB_NAME", "synofoto"),
+    user=os.getenv("NAS_DB_USER", "postgres"),
+    cursor_factory=psycopg2.extras.RealDictCursor,
+)
+
+
+@contextmanager
 def db():
-    return psycopg2.connect(
-        host=os.getenv("NAS_DB_HOST", "192.168.1.169"),
-        port=int(os.getenv("NAS_DB_PORT", "5432")),
-        dbname=os.getenv("NAS_DB_NAME", "synofoto"),
-        user=os.getenv("NAS_DB_USER", "postgres"),
-        cursor_factory=psycopg2.extras.RealDictCursor,
-    )
+    conn = _db_pool.getconn()
+    try:
+        yield conn
+    finally:
+        _db_pool.putconn(conn)
+
+
+# ---------------------------------------------------------------------------
+# Reference data cache (persons, locations, concepts, cameras rarely change)
+# ---------------------------------------------------------------------------
+
+_ref_cache: dict[str, tuple[float, list]] = {}   # key -> (expires_at, data)
+_REF_TTL = 300  # 5 minutes
+
+
+def _cached_ref(key: str, sql: str) -> list:
+    now = time.monotonic()
+    entry = _ref_cache.get(key)
+    if entry and entry[0] > now:
+        return entry[1]
+    with db() as conn:
+        cur = conn.cursor()
+        cur.execute(sql)
+        rows = [dict(r) for r in cur.fetchall()]
+    _ref_cache[key] = (now + _REF_TTL, rows)
+    return rows
 
 
 _photos_session = None
@@ -71,25 +104,18 @@ def get_session():
 
 @app.get("/api/persons")
 def list_persons():
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("""
+    return _cached_ref("persons", """
         SELECT p.id, p.name, pic.item_count
         FROM person p
         JOIN person_item_count pic ON pic.id_person = p.id
         WHERE p.name != '' AND p.hidden = false
         ORDER BY pic.item_count DESC
     """)
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
 
 
 @app.get("/api/locations")
 def list_locations():
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("""
+    return _cached_ref("locations", """
         SELECT DISTINCT gi.country, gi.first_level, gi.second_level,
                count(DISTINCT u.id) as item_count
         FROM geocoding_info gi
@@ -98,16 +124,11 @@ def list_locations():
         GROUP BY gi.country, gi.first_level, gi.second_level
         ORDER BY gi.country, gi.first_level, gi.second_level
     """)
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
 
 
 @app.get("/api/concepts")
 def list_concepts():
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("""
+    return _cached_ref("concepts", """
         SELECT c.id, c.stem, count(mc.id_unit) as usage_count
         FROM concept c
         JOIN many_unit_has_many_concept mc ON mc.id_concept = c.id
@@ -115,25 +136,17 @@ def list_concepts():
         GROUP BY c.id, c.stem
         ORDER BY usage_count DESC
     """)
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
 
 
 @app.get("/api/cameras")
 def list_cameras():
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("""
+    return _cached_ref("cameras", """
         SELECT camera, count(*) as item_count
         FROM metadata
         WHERE camera IS NOT NULL AND camera != ''
         GROUP BY camera
         ORDER BY item_count DESC
     """)
-    rows = [dict(r) for r in cur.fetchall()]
-    conn.close()
-    return rows
 
 
 # ---------------------------------------------------------------------------
@@ -331,28 +344,27 @@ def _stream_motion_video(folder_name: str, filename: str):
 
 @app.get("/api/media/{item_id}")
 def stream_media(item_id: int, as_video: bool = False):
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT u.filename, u.item_type, f.name AS folder_name,
-               comp.companion_filename, comp.companion_folder
-        FROM unit u
-        JOIN folder f ON f.id = u.id_folder
-        LEFT JOIN live_additional la_m ON la_m.id_unit = u.id AND u.item_type = 3
-        LEFT JOIN LATERAL (
-            SELECT comp_u.filename AS companion_filename, f_comp.name AS companion_folder
-            FROM live_additional la_c
-            JOIN unit comp_u ON comp_u.id = la_c.id_unit
-                            AND comp_u.id != u.id
-                            AND (comp_u.filename ILIKE '%%.mov' OR comp_u.filename ILIKE '%%.mp4')
-            JOIN folder f_comp ON f_comp.id = comp_u.id_folder
-            WHERE la_c.grouping_key = la_m.grouping_key
-            LIMIT 1
-        ) comp ON la_m.id_unit IS NOT NULL
-        WHERE u.id = %s
-    """, (item_id,))
-    row = cur.fetchone()
-    conn.close()
+    with db() as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT u.filename, u.item_type, f.name AS folder_name,
+                   comp.companion_filename, comp.companion_folder
+            FROM unit u
+            JOIN folder f ON f.id = u.id_folder
+            LEFT JOIN live_additional la_m ON la_m.id_unit = u.id AND u.item_type = 3
+            LEFT JOIN LATERAL (
+                SELECT comp_u.filename AS companion_filename, f_comp.name AS companion_folder
+                FROM live_additional la_c
+                JOIN unit comp_u ON comp_u.id = la_c.id_unit
+                                AND comp_u.id != u.id
+                                AND (comp_u.filename ILIKE '%%.mov' OR comp_u.filename ILIKE '%%.mp4')
+                JOIN folder f_comp ON f_comp.id = comp_u.id_folder
+                WHERE la_c.grouping_key = la_m.grouping_key
+                LIMIT 1
+            ) comp ON la_m.id_unit IS NOT NULL
+            WHERE u.id = %s
+        """, (item_id,))
+        row = cur.fetchone()
 
     if not row:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -395,54 +407,53 @@ def stream_media(item_id: int, as_video: bool = False):
 
 @app.get("/api/meta/{item_id}")
 def item_meta(item_id: int):
-    conn = db()
-    cur = conn.cursor()
+    with db() as conn:
+        cur = conn.cursor()
 
-    # Full item details (EXIF, video, folder — everything the info panel needs)
-    cur.execute("""
-        SELECT f.name AS folder_path,
-               m.camera, m.lens, m.focal_length, m.aperture, m.iso,
-               m.exposure_time, m.flash, m.orientation, m.description,
-               m.latitude, m.longitude,
-               va.duration,
-               (va.video_info->>'resolution_x')::int  AS vres_x,
-               (va.video_info->>'resolution_y')::int  AS vres_y,
-               (va.video_info->>'frame_rate_num')::int AS fps,
-               va.video_info->>'video_codec'              AS video_codec,
-               (va.video_info->>'video_bitrate')::bigint  AS video_bitrate,
-               va.video_info->>'container_type'           AS container_type,
-               va.audio_info->>'audio_codec'              AS audio_codec,
-               (va.audio_info->>'channel')::int           AS audio_channel,
-               (va.audio_info->>'frequency')::int         AS audio_frequency,
-               (va.audio_info->>'audio_bitrate')::bigint  AS audio_bitrate
-        FROM unit u
-        LEFT JOIN folder f           ON f.id = u.id_folder
-        LEFT JOIN metadata m         ON m.id_unit = u.id
-        LEFT JOIN video_additional va ON va.id_unit = u.id
-        WHERE u.id = %s
-    """, (item_id,))
-    detail = dict(cur.fetchone() or {})
+        # Full item details (EXIF, video, folder — everything the info panel needs)
+        cur.execute("""
+            SELECT f.name AS folder_path,
+                   m.camera, m.lens, m.focal_length, m.aperture, m.iso,
+                   m.exposure_time, m.flash, m.orientation, m.description,
+                   m.latitude, m.longitude,
+                   va.duration,
+                   (va.video_info->>'resolution_x')::int  AS vres_x,
+                   (va.video_info->>'resolution_y')::int  AS vres_y,
+                   (va.video_info->>'frame_rate_num')::int AS fps,
+                   va.video_info->>'video_codec'              AS video_codec,
+                   (va.video_info->>'video_bitrate')::bigint  AS video_bitrate,
+                   va.video_info->>'container_type'           AS container_type,
+                   va.audio_info->>'audio_codec'              AS audio_codec,
+                   (va.audio_info->>'channel')::int           AS audio_channel,
+                   (va.audio_info->>'frequency')::int         AS audio_frequency,
+                   (va.audio_info->>'audio_bitrate')::bigint  AS audio_bitrate
+            FROM unit u
+            LEFT JOIN folder f           ON f.id = u.id_folder
+            LEFT JOIN metadata m         ON m.id_unit = u.id
+            LEFT JOIN video_additional va ON va.id_unit = u.id
+            WHERE u.id = %s
+        """, (item_id,))
+        detail = dict(cur.fetchone() or {})
 
-    cur.execute("""
-        SELECT p.name
-        FROM many_unit_has_many_person mp
-        JOIN person p ON p.id = mp.id_person
-        WHERE mp.id_unit = %s AND p.name != ''
-        ORDER BY p.name
-    """, (item_id,))
-    detail["persons"] = [r["name"] for r in cur.fetchall()]
+        cur.execute("""
+            SELECT p.name
+            FROM many_unit_has_many_person mp
+            JOIN person p ON p.id = mp.id_person
+            WHERE mp.id_unit = %s AND p.name != ''
+            ORDER BY p.name
+        """, (item_id,))
+        detail["persons"] = [r["name"] for r in cur.fetchall()]
 
-    cur.execute("""
-        SELECT c.stem, mc.confidence
-        FROM many_unit_has_many_concept mc
-        JOIN concept c ON c.id = mc.id_concept
-        WHERE mc.id_unit = %s AND c.hidden = false
-        ORDER BY mc.confidence DESC
-        LIMIT 20
-    """, (item_id,))
-    detail["concepts"] = [{"stem": r["stem"], "confidence": round(r["confidence"], 2)} for r in cur.fetchall()]
+        cur.execute("""
+            SELECT c.stem, mc.confidence
+            FROM many_unit_has_many_concept mc
+            JOIN concept c ON c.id = mc.id_concept
+            WHERE mc.id_unit = %s AND c.hidden = false
+            ORDER BY mc.confidence DESC
+            LIMIT 20
+        """, (item_id,))
+        detail["concepts"] = [{"stem": r["stem"], "confidence": round(r["confidence"], 2)} for r in cur.fetchall()]
 
-    conn.close()
     return detail
 
 

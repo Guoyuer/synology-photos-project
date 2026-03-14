@@ -3,6 +3,7 @@
 import importlib
 import sys
 import types
+from contextlib import contextmanager
 from unittest.mock import MagicMock, patch, PropertyMock
 
 import pytest
@@ -26,6 +27,12 @@ def _make_conn(cur):
     return conn
 
 
+@contextmanager
+def _db_ctx(conn):
+    """Mimic the db() context manager for tests."""
+    yield conn
+
+
 def _row(*fields_values):
     """Build a dict-like row from keyword arguments."""
     return dict(fields_values)
@@ -43,7 +50,9 @@ def app_client():
     # Stub heavy dependencies before the app module is first imported
     psycopg2_stub = MagicMock()
     psycopg2_extras_stub = MagicMock()
+    psycopg2_pool_stub = MagicMock()
     psycopg2_stub.extras = psycopg2_extras_stub
+    psycopg2_stub.pool = psycopg2_pool_stub
     psycopg2_stub.connect = MagicMock()
 
     requests_stub = MagicMock()
@@ -58,6 +67,7 @@ def app_client():
         {
             "psycopg2": psycopg2_stub,
             "psycopg2.extras": psycopg2_extras_stub,
+            "psycopg2.pool": psycopg2_pool_stub,
             "requests": requests_stub,
             "dotenv": dotenv_stub,
             "session_manager": session_manager_stub,
@@ -92,13 +102,14 @@ def _dict_row(**kw):
 class TestListPersons:
     def test_returns_list(self, app_client):
         client, main_mod, psycopg2_stub, _ = app_client
+        main_mod._ref_cache.clear()
         rows = [
             _dict_row(id=1, name="Alice", item_count=50),
             _dict_row(id=2, name="Bob",   item_count=30),
         ]
         cur = _make_cursor(rows)
         conn = _make_conn(cur)
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/persons")
         assert resp.status_code == 200
         data = resp.json()
@@ -108,19 +119,22 @@ class TestListPersons:
 
     def test_returns_empty_list(self, app_client):
         client, main_mod, _, _ = app_client
+        main_mod._ref_cache.clear()
         cur = _make_cursor([])
         conn = _make_conn(cur)
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/persons")
         assert resp.status_code == 200
         assert resp.json() == []
 
-    def test_calls_close(self, app_client):
+    def test_uses_connection_pool(self, app_client):
+        """db() is a context manager — connection is returned to pool, not closed."""
         client, main_mod, _, _ = app_client
+        main_mod._ref_cache.clear()
         conn = _make_conn(_make_cursor([]))
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             client.get("/api/persons")
-        conn.close.assert_called_once()
+        conn.close.assert_not_called()
 
 
 # ===========================================================================
@@ -130,12 +144,13 @@ class TestListPersons:
 class TestListLocations:
     def test_returns_list(self, app_client):
         client, main_mod, _, _ = app_client
+        main_mod._ref_cache.clear()
         rows = [
             _dict_row(country="Singapore", first_level="Central", second_level=None, item_count=10),
         ]
         cur = _make_cursor(rows)
         conn = _make_conn(cur)
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/locations")
         assert resp.status_code == 200
         data = resp.json()
@@ -144,8 +159,9 @@ class TestListLocations:
 
     def test_empty(self, app_client):
         client, main_mod, _, _ = app_client
+        main_mod._ref_cache.clear()
         conn = _make_conn(_make_cursor([]))
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/locations")
         assert resp.json() == []
 
@@ -157,13 +173,14 @@ class TestListLocations:
 class TestListConcepts:
     def test_returns_list(self, app_client):
         client, main_mod, _, _ = app_client
+        main_mod._ref_cache.clear()
         rows = [
             _dict_row(id=1, stem="beach", usage_count=99),
             _dict_row(id=2, stem="mountain", usage_count=42),
         ]
         cur = _make_cursor(rows)
         conn = _make_conn(cur)
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/concepts")
         assert resp.status_code == 200
         data = resp.json()
@@ -178,13 +195,14 @@ class TestListConcepts:
 class TestListCameras:
     def test_returns_list(self, app_client):
         client, main_mod, _, _ = app_client
+        main_mod._ref_cache.clear()
         rows = [
             _dict_row(camera="iPhone 14 Pro", item_count=200),
             _dict_row(camera="Sony A7IV",     item_count=50),
         ]
         cur = _make_cursor(rows)
         conn = _make_conn(cur)
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/cameras")
         assert resp.status_code == 200
         data = resp.json()
@@ -193,8 +211,9 @@ class TestListCameras:
 
     def test_empty(self, app_client):
         client, main_mod, _, _ = app_client
+        main_mod._ref_cache.clear()
         conn = _make_conn(_make_cursor([]))
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/cameras")
         assert resp.json() == []
 
@@ -462,7 +481,7 @@ class TestStreamMedia:
         fake_resp.iter_content.return_value = iter([b"fakeimage"])
 
         sess = self._make_session()
-        with patch.object(main_mod, "db", return_value=conn), \
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)), \
              patch.object(main_mod, "get_session", return_value=sess), \
              patch.object(main_mod.requests, "post", return_value=fake_resp):
             resp = client.get("/api/media/42")
@@ -472,6 +491,6 @@ class TestStreamMedia:
         client, main_mod, _, _ = app_client
         cur = _make_cursor([])
         conn = _make_conn(cur)
-        with patch.object(main_mod, "db", return_value=conn):
+        with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/media/9999")
         assert resp.status_code == 404
