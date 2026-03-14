@@ -23,6 +23,7 @@ python cli.py collect --persons "Alice" --from 2024-01-01 --download
 
 # Run the FastAPI backend (from repo root)
 # Kill any existing instance first, then start in background
+# WARNING: Only kill port 8000, never kill 5173 unless explicitly asked to restart the frontend
 lsof -ti:8000 | xargs kill -9 2>/dev/null; true
 source venv/bin/activate && cd web/api && uvicorn main:app --reload --port 8000 --reload-dir ../.. &
 

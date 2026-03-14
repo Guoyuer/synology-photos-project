@@ -38,8 +38,8 @@ app.add_middleware(
 )
 
 
-_db_pool = psycopg2.pool.SimpleConnectionPool(
-    minconn=1, maxconn=4,
+_db_pool = psycopg2.pool.ThreadedConnectionPool(
+    minconn=2, maxconn=10,
     host=os.getenv("NAS_DB_HOST", "192.168.1.169"),
     port=int(os.getenv("NAS_DB_PORT", "5432")),
     dbname=os.getenv("NAS_DB_NAME", "synofoto"),
