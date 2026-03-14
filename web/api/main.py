@@ -5,13 +5,15 @@ import sys
 from datetime import datetime, timezone
 from typing import Optional
 
+import json
+import mimetypes
 import psycopg2
 import psycopg2.extras
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
@@ -202,14 +204,13 @@ class DownloadRequest(BaseModel):
 
 @app.post("/api/download")
 def download_files(req: DownloadRequest):
-    import json as _json
     photos = get_session()
     url = photos.session._base_url + "entry.cgi"
     data = {
         "api": "SYNO.Foto.Download",
         "method": "download",
         "version": "2",
-        "item_id": _json.dumps(req.item_ids),
+        "item_id": json.dumps(req.item_ids),
         "download_type": "source",
         "force_download": "true",
         "_sid": photos.session.sid,
@@ -235,33 +236,48 @@ def download_files(req: DownloadRequest):
 # Full-resolution media stream (for lightbox preview)
 # ---------------------------------------------------------------------------
 
-def _filestation_stream(folder_name: str, filename: str, content_type: str):
-    """Stream a file from Synology via FileStation API (for companion/embedded videos)."""
-    import json as _json
+def _filestation_get(folder_name: str, filename: str, stream: bool = False):
+    """Fetch a file via FileStation API. Returns a raw requests.Response."""
     photos = get_session()
-    url = photos.session._base_url + "entry.cgi"
     fs_path = f"/home/Photos{folder_name}/{filename}"
-    resp = requests.get(
-        url,
-        params={
-            "api": "SYNO.FileStation.Download",
-            "method": "download",
-            "version": "2",
-            "path": _json.dumps([fs_path]),
-            "mode": "open",
-            "SynoToken": photos.session.syno_token,
-            "_sid": photos.session.sid,
-        },
-        verify=photos.session._verify,
-        stream=True,
-        timeout=300,
-    )
+    # Use synology-api's request_data which handles _sid and auth token automatically.
+    # For streaming we fall back to raw requests since request_data doesn't support stream=True.
+    if stream:
+        resp = requests.get(
+            photos.session._base_url + "entry.cgi",
+            params={
+                "api": "SYNO.FileStation.Download",
+                "method": "download",
+                "version": "2",
+                "path": json.dumps([fs_path]),
+                "mode": "open",
+                "SynoToken": photos.session.syno_token,
+                "_sid": photos.session.sid,
+            },
+            verify=photos.session._verify,
+            stream=True,
+            timeout=300,
+        )
+    else:
+        resp = photos.request_data(
+            api_name="SYNO.FileStation.Download",
+            api_path="entry.cgi",
+            req_param={"method": "download", "version": "2",
+                       "path": json.dumps([fs_path]), "mode": "open"},
+            method="get",
+            response_json=False,
+        )
+    return resp
+
+
+def _filestation_stream(folder_name: str, filename: str, content_type: str):
+    """Stream a file from Synology via FileStation API (for companion videos)."""
+    resp = _filestation_get(folder_name, filename, stream=True)
     return StreamingResponse(resp.iter_content(chunk_size=65536), media_type=content_type)
 
 
 @app.get("/api/media/{item_id}")
 def stream_media(item_id: int, as_video: bool = False):
-    import json as _json, mimetypes
     conn = db()
     cur = conn.cursor()
     cur.execute("""
@@ -294,30 +310,14 @@ def stream_media(item_id: int, as_video: bool = False):
             if companion:
                 return _filestation_stream(companion["folder_name"], companion["filename"], "video/mp4")
 
-        elif row["item_type"] == 6:  # motion photo — download JPEG and extract embedded MP4
+        elif row["item_type"] == 6:  # motion photo — extract embedded MP4 from JPEG
             folder_name, filename = row["folder_name"], row["filename"]
             conn.close()
-            photos = get_session()
-            url = photos.session._base_url + "entry.cgi"
-            fs_path = f"/home/Photos{folder_name}/{filename}"
-            resp = requests.get(
-                url,
-                params={
-                    "api": "SYNO.FileStation.Download",
-                    "method": "download",
-                    "version": "2",
-                    "path": _json.dumps([fs_path]),
-                    "mode": "open",
-                    "SynoToken": photos.session.syno_token,
-                    "_sid": photos.session.sid,
-                },
-                verify=photos.session._verify,
-                timeout=300,
-            )
-            data = resp.content
+            data = _filestation_get(folder_name, filename).content
+            # Google Motion Photo embeds an MP4 at the end of the JPEG.
+            # The last ftyp box marks the start of the MP4 container.
             idx = data.rfind(b'ftyp')
             if idx >= 4:
-                from fastapi.responses import Response
                 return Response(content=data[idx - 4:], media_type="video/mp4")
 
         else:
@@ -335,7 +335,7 @@ def stream_media(item_id: int, as_video: bool = False):
             "api": "SYNO.Foto.Download",
             "method": "download",
             "version": "2",
-            "item_id": _json.dumps([item_id]),
+            "item_id": json.dumps([item_id]),
             "download_type": "source",
             "force_download": "true",
             "_sid": photos.session.sid,
