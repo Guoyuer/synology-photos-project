@@ -7,7 +7,7 @@ import argparse
 from dotenv import load_dotenv
 
 from session_manager import get_photos_api, clear_session
-from features import user, albums, folders, items, persons, download
+from features import user, albums, folders, items, persons, download, collect
 
 # Load environment variables
 load_dotenv()
@@ -98,6 +98,24 @@ def cmd_persons(args):
         persons.list_persons(photos, limit=args.limit)
 
 
+def cmd_collect(args):
+    """Handle collect command."""
+    config = get_config()
+    photos = get_photos_instance(config)
+    collect.collect(
+        photos,
+        persons=args.persons,
+        location=args.location,
+        from_date=args.from_date,
+        to_date=args.to_date,
+        item_type=args.type,
+        output_dir=args.output,
+        download=args.download,
+        limit=args.limit,
+        all_persons=args.all_persons,
+    )
+
+
 def cmd_session(args):
     """Handle session command."""
     if args.action == 'clear':
@@ -172,6 +190,18 @@ Examples:
     persons_parser.add_argument('--download', action='store_true', help='Download photos (requires --photos)')
     persons_parser.add_argument('--output', type=str, default='downloads', help='Output directory for downloads')
 
+    # Collect command
+    collect_parser = subparsers.add_parser('collect', help='Collect photos/videos by persons, location, and date')
+    collect_parser.add_argument('--persons', nargs='+', metavar='NAME', help='Person names (all must appear)')
+    collect_parser.add_argument('--location', type=str, help='Location name (country or region)')
+    collect_parser.add_argument('--from', dest='from_date', metavar='YYYY-MM-DD', help='Start date (inclusive)')
+    collect_parser.add_argument('--to', dest='to_date', metavar='YYYY-MM-DD', help='End date (inclusive)')
+    collect_parser.add_argument('--type', choices=['photo', 'video', 'live', 'motion'], help='Media type filter')
+    collect_parser.add_argument('--output', type=str, help='Output directory (auto-named if omitted)')
+    collect_parser.add_argument('--download', action='store_true', help='Download files (preview only without this)')
+    collect_parser.add_argument('--limit', type=int, help='Cap number of items')
+    collect_parser.add_argument('--all-persons', action='store_true', help='All persons must co-appear in same photo (default: any)')
+
     # Session command
     session_parser = subparsers.add_parser('session', help='Manage login session')
     session_parser.add_argument('action', choices=['status', 'clear'], help='Session action')
@@ -192,6 +222,7 @@ Examples:
         'folders': cmd_folders,
         'items': cmd_items,
         'persons': cmd_persons,
+        'collect': cmd_collect,
         'session': cmd_session,
         'all': cmd_all,
     }
