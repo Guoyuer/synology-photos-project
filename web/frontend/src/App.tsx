@@ -113,11 +113,12 @@ export default function App() {
         {error && (
           <div className="p-4 bg-red-900/50 text-red-300 text-sm border-b border-red-700">{error}</div>
         )}
-        {loading && (
+        {loading && !result && (
           <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">Searching…</div>
         )}
-        {!loading && result && (
+        {result && (
           <ResultsGrid items={result.items} totalMb={result.total_mb}
+            loading={loading}
             cart={cart} cartIds={cartIds} onToggle={toggleCart}
             onSelectAll={addAllToCart} onClearAll={removeFromCart}
             onClearCart={() => setCart([])}

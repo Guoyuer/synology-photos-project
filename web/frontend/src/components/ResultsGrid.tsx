@@ -11,6 +11,7 @@ import type { MediaItem } from '../types'
 interface Props {
   items: MediaItem[]
   totalMb: number
+  loading?: boolean
   cart: MediaItem[]
   cartIds: Set<number>
   sortDesc: boolean
@@ -26,7 +27,7 @@ interface Props {
 
 const ITEM_W = 172  // approximate grid item width + gap
 
-export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll, onClearCart, onRemoveFromCart, onDateFilter, onClearDateFilter }: Props) {
+export function ResultsGrid({ items, totalMb, loading, cart, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll, onClearCart, onRemoveFromCart, onDateFilter, onClearDateFilter }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [preview, setPreview] = useState<MediaItem | null>(null)
   const [infoItem, setInfoItem] = useState<MediaItem | null>(null)
@@ -106,6 +107,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
       {/* Toolbar */}
       <div className="flex items-center gap-4 px-4 py-3 bg-gray-900 border-b border-gray-700 shrink-0">
         <span className="text-gray-300 font-semibold">{items.length} items</span>
+        {loading && <span className="text-gray-500 text-xs animate-pulse">Searching…</span>}
         <span className="text-gray-500 text-sm">{totalMb >= 1000 ? (totalMb / 1024).toFixed(1) + ' GB' : totalMb.toFixed(1) + ' MB'} total</span>
         <div className="ml-auto flex items-center gap-3">
           <button onClick={() => onSelectAll(items)} className="text-xs text-blue-400 hover:text-blue-300">Select all</button>
