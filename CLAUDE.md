@@ -93,6 +93,23 @@ The Synology Photos API doesn't support complex multi-filter queries (persons + 
 
 Shared formatting utilities (`fmt`, `fmtDur`, `TYPE_BADGE`) live in `src/utils.ts`.
 
+### SQL performance rule
+
+**Always benchmark new SQL conditions against the live DB before committing.** Use `EXPLAIN ANALYZE` and measure wall-clock time with `\timing` in psql (or `time psql -c "..."`). A condition that looks correct can be orders-of-magnitude slower than expected due to:
+- Full derived-table materialization (e.g. `LEFT JOIN (SELECT ... FROM large_table GROUP BY ...) sub`) — prefer correlated EXISTS/NOT EXISTS subqueries when the table is large
+- Missing index on the join column (check with `\d tablename`)
+- `SELECT DISTINCT` forcing a sort/hash over a huge intermediate result
+
+Benchmark template (run from repo root with venv active):
+```bash
+source venv/bin/activate
+time psql -h 192.168.1.169 -U postgres synofoto -c "EXPLAIN ANALYZE <your query here>"
+# Or for quick wall-clock on the collect endpoint:
+time curl -s -X POST http://localhost:8000/api/collect \
+  -H 'Content-Type: application/json' \
+  -d '{"person_count":"none"}' | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['count'])"
+```
+
 ### Environment variables (`.env`)
 ```
 NAS_IP, NAS_PORT, NAS_USERNAME, NAS_PASSWORD
