@@ -52,6 +52,7 @@ def _make_db(rows, description=None):
             ("width",), ("height",), ("duration",), ("vres_x",),
             ("fps",), ("country",), ("district",), ("camera",),
             ("latitude",), ("longitude",),
+            ("companion_filename",), ("companion_folder",),
         ]
 
     cur = MagicMock()
@@ -70,6 +71,7 @@ def _row_tuple(**kw):
         "width", "height", "duration", "vres_x",
         "fps", "country", "district", "camera",
         "latitude", "longitude",
+        "companion_filename", "companion_folder",
     ]
     return tuple(kw.get(c) for c in cols)
 
@@ -128,7 +130,14 @@ class TestQueryItemsSQL:
         assert "1=1" in sql
         assert "EXISTS" not in sql or "concept" not in sql   # no concept filter
         assert "many_unit_has_many_person" not in sql
-        assert "LIMIT" not in sql
+        assert "LIMIT %s" not in sql   # no top-level LIMIT (LIMIT 1 inside LATERAL is ok)
+
+    def test_companion_lateral_join_always_present(self, collect_mod, psycopg2_mock):
+        sql, params, _ = self._run(collect_mod, psycopg2_mock)
+        assert "LATERAL" in sql
+        assert "companion_filename" in sql
+        assert "companion_folder" in sql
+        assert "live_additional" in sql
 
     # -- Person filters ------------------------------------------------------
 
@@ -231,7 +240,7 @@ class TestQueryItemsSQL:
 
     def test_no_limit_when_not_given(self, collect_mod, psycopg2_mock):
         sql, params, _ = self._run(collect_mod, psycopg2_mock)
-        assert "LIMIT" not in sql
+        assert "LIMIT %s" not in sql   # no top-level LIMIT
         assert 10 not in params  # no accidental limit
 
 

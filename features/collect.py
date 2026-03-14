@@ -309,7 +309,9 @@ def query_items(
             m.orientation,
             m.description,
             m.latitude,
-            m.longitude
+            m.longitude,
+            comp_la.companion_filename,
+            comp_la.companion_folder
         FROM unit u
         {person_filter}
         {face_join}
@@ -317,6 +319,17 @@ def query_items(
         LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
         LEFT JOIN folder f           ON f.id = u.id_folder
         LEFT JOIN metadata m         ON m.id_unit = u.id
+        LEFT JOIN live_additional la_m ON la_m.id_unit = u.id AND u.item_type = 3
+        LEFT JOIN LATERAL (
+            SELECT comp_u.filename AS companion_filename, f_comp.name AS companion_folder
+            FROM live_additional la_c
+            JOIN unit comp_u ON comp_u.id = la_c.id_unit
+                            AND comp_u.id != u.id
+                            AND (comp_u.filename ILIKE '%%.mov' OR comp_u.filename ILIKE '%%.mp4')
+            JOIN folder f_comp ON f_comp.id = comp_u.id_folder
+            WHERE la_c.grouping_key = la_m.grouping_key
+            LIMIT 1
+        ) comp_la ON la_m.id_unit IS NOT NULL
         WHERE {' AND '.join(conditions)}
         ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}
         {'LIMIT %s' if limit else ''}

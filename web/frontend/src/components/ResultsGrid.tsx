@@ -138,7 +138,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
           <div className="max-h-56 overflow-y-auto">
             {cart.map(item => (
               <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-800 border-b border-gray-800">
-                <img src={thumbnailUrl(item.id, 'sm')} className="w-10 h-10 object-cover rounded bg-gray-700 shrink-0" />
+                <img src={thumbnailUrl(item.id, item.cache_key, 'sm')} className="w-10 h-10 object-cover rounded bg-gray-700 shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-gray-200 truncate font-mono">{item.filename}</p>
                   <p className="text-xs text-gray-500">
@@ -191,7 +191,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
                     >
                       {gridVirtualizer.isScrolling
                         ? <div className="w-full h-32 bg-gray-800" />
-                        : <img src={thumbnailUrl(item.id, 'sm')} alt={item.filename} className="w-full h-32 object-cover bg-gray-800"
+                        : <img src={thumbnailUrl(item.id, item.cache_key, 'sm')} alt={item.filename} className="w-full h-32 object-cover bg-gray-800"
                             onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
                       }
                       <div className="absolute top-1 left-1">

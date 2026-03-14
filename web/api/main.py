@@ -287,54 +287,76 @@ def _filestation_stream(folder_name: str, filename: str, content_type: str):
     return StreamingResponse(resp.iter_content(chunk_size=65536), media_type=content_type)
 
 
+def _stream_motion_video(folder_name: str, filename: str):
+    """Stream the MP4 embedded at the end of a Google Motion Photo JPEG.
+
+    Scans incoming chunks for the last 'ftyp' box header, then pipes from that
+    offset onward — avoids buffering the entire file in memory.
+    """
+    photos = get_session()
+    fs_path = f"/home/Photos{folder_name}/{filename}"
+    resp = requests.get(
+        photos.session._base_url + "entry.cgi",
+        params={
+            "api": "SYNO.FileStation.Download",
+            "method": "download",
+            "version": "2",
+            "path": json.dumps([fs_path]),
+            "mode": "open",
+            "SynoToken": photos.session.syno_token,
+            "_sid": photos.session.sid,
+        },
+        verify=photos.session._verify,
+        stream=True,
+        timeout=300,
+    )
+    buffer = b""
+    found = False
+    for chunk in resp.iter_content(65536):
+        if found:
+            yield chunk
+        else:
+            buffer += chunk
+            idx = buffer.rfind(b'ftyp')
+            if idx >= 4:
+                found = True
+                yield buffer[idx - 4:]
+                buffer = b""
+
+
 @app.get("/api/media/{item_id}")
 def stream_media(item_id: int, as_video: bool = False):
     conn = db()
     cur = conn.cursor()
     cur.execute("""
-        SELECT u.filename, u.item_type, f.name AS folder_name
-        FROM unit u JOIN folder f ON f.id = u.id_folder
+        SELECT u.filename, u.item_type, f.name AS folder_name,
+               comp.companion_filename, comp.companion_folder
+        FROM unit u
+        JOIN folder f ON f.id = u.id_folder
+        LEFT JOIN live_additional la_m ON la_m.id_unit = u.id AND u.item_type = 3
+        LEFT JOIN LATERAL (
+            SELECT comp_u.filename AS companion_filename, f_comp.name AS companion_folder
+            FROM live_additional la_c
+            JOIN unit comp_u ON comp_u.id = la_c.id_unit
+                            AND comp_u.id != u.id
+                            AND (comp_u.filename ILIKE '%%.mov' OR comp_u.filename ILIKE '%%.mp4')
+            JOIN folder f_comp ON f_comp.id = comp_u.id_folder
+            WHERE la_c.grouping_key = la_m.grouping_key
+            LIMIT 1
+        ) comp ON la_m.id_unit IS NOT NULL
         WHERE u.id = %s
     """, (item_id,))
     row = cur.fetchone()
+    conn.close()
 
     if not row:
-        conn.close()
         raise HTTPException(status_code=404, detail="Item not found")
 
     if as_video:
-        if row["item_type"] == 3:  # live photo — find companion MOV/MP4 unit
-            cur.execute("""
-                SELECT u.filename, f.name AS folder_name
-                FROM live_additional la
-                JOIN unit u ON u.id = la.id_unit
-                JOIN folder f ON f.id = u.id_folder
-                WHERE la.grouping_key = (
-                    SELECT grouping_key FROM live_additional WHERE id_unit = %s
-                )
-                AND u.id != %s
-                AND (u.filename ILIKE %s OR u.filename ILIKE %s)
-                LIMIT 1
-            """, (item_id, item_id, '%.mov', '%.mp4'))
-            companion = cur.fetchone()
-            conn.close()
-            if companion:
-                return _filestation_stream(companion["folder_name"], companion["filename"], "video/mp4")
-
-        elif row["item_type"] == 6:  # motion photo — extract embedded MP4 from JPEG
-            folder_name, filename = row["folder_name"], row["filename"]
-            conn.close()
-            data = _filestation_get(folder_name, filename).content
-            # Google Motion Photo embeds an MP4 at the end of the JPEG.
-            # The last ftyp box marks the start of the MP4 container.
-            idx = data.rfind(b'ftyp')
-            if idx >= 4:
-                return Response(content=data[idx - 4:], media_type="video/mp4")
-
-        else:
-            conn.close()
-    else:
-        conn.close()
+        if row["item_type"] == 3 and row["companion_filename"] and row["companion_folder"]:
+            return _filestation_stream(row["companion_folder"], row["companion_filename"], "video/mp4")
+        if row["item_type"] == 6:
+            return StreamingResponse(_stream_motion_video(row["folder_name"], row["filename"]), media_type="video/mp4")
 
     # Default: stream source via SYNO.Foto.Download
     photos = get_session()
@@ -398,19 +420,9 @@ def item_meta(item_id: int):
 # Thumbnail proxy
 # ---------------------------------------------------------------------------
 
-@app.get("/api/thumbnail/{item_id}")
-def thumbnail(item_id: int, size: str = "sm"):
+@app.get("/api/thumbnail/{item_id}/{cache_key}")
+def thumbnail(item_id: int, cache_key: str, size: str = "sm"):
     size_map = {"sm": "sm", "md": "m", "lg": "xl"}
-
-    conn = db()
-    cur = conn.cursor()
-    cur.execute("SELECT cache_key FROM unit WHERE id = %s", (item_id,))
-    row = cur.fetchone()
-    conn.close()
-    if not row:
-        raise HTTPException(status_code=404, detail="Item not found")
-    cache_key = row["cache_key"]
-
     photos = get_session()
     url = photos.session._base_url + "entry.cgi"
     params = {

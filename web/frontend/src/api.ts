@@ -38,8 +38,8 @@ export function mediaUrl(id: number, asVideo = false) {
   return asVideo ? `${BASE}/media/${id}?as_video=true` : `${BASE}/media/${id}`
 }
 
-export function thumbnailUrl(id: number, size: 'sm' | 'md' | 'lg' = 'sm') {
-  return `${BASE}/thumbnail/${id}?size=${size}`
+export function thumbnailUrl(id: number, cacheKey: string, size: 'sm' | 'md' | 'lg' = 'sm') {
+  return `${BASE}/thumbnail/${id}/${cacheKey}?size=${size}`
 }
 
 export function fetchItemMeta(id: number): Promise<{ persons: string[]; concepts: { stem: string; confidence: number }[] }> {

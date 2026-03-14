@@ -382,7 +382,7 @@ class TestDownload:
 
 
 # ===========================================================================
-# GET /api/thumbnail/{id}
+# GET /api/thumbnail/{item_id}/{cache_key}
 # ===========================================================================
 
 class TestThumbnail:
@@ -396,51 +396,41 @@ class TestThumbnail:
 
     def test_returns_image(self, app_client):
         client, main_mod, _, _ = app_client
-        db_row = {"cache_key": "CKEY42"}
-        cur = _make_cursor([db_row])
-        conn = _make_conn(cur)
-
         fake_resp = MagicMock()
         fake_resp.headers = {"Content-Type": "image/jpeg"}
-        fake_resp.iter_content.return_value = iter([b"\xff\xd8\xff"])
-
+        fake_resp.content = b"\xff\xd8\xff"
         sess = self._make_session()
-        with patch.object(main_mod, "db", return_value=conn), \
-             patch.object(main_mod, "get_session", return_value=sess), \
+        with patch.object(main_mod, "get_session", return_value=sess), \
              patch.object(main_mod.requests, "get", return_value=fake_resp):
-            resp = client.get("/api/thumbnail/7")
+            resp = client.get("/api/thumbnail/7/CKEY42")
         assert resp.status_code == 200
 
-    def test_404_on_missing_item(self, app_client):
+    def test_404_when_synology_returns_html(self, app_client):
+        """Synology returns text/html when thumbnail unavailable → 404."""
         client, main_mod, _, _ = app_client
-        cur = _make_cursor([])
-        conn = _make_conn(cur)
-        with patch.object(main_mod, "db", return_value=conn):
-            resp = client.get("/api/thumbnail/9999")
+        fake_resp = MagicMock()
+        fake_resp.headers = {"Content-Type": "text/html"}
+        fake_resp.content = b"<html>error</html>"
+        sess = self._make_session()
+        with patch.object(main_mod, "get_session", return_value=sess), \
+             patch.object(main_mod.requests, "get", return_value=fake_resp):
+            resp = client.get("/api/thumbnail/9999/BADKEY")
         assert resp.status_code == 404
 
     def test_cache_key_format(self, app_client):
         """cache_key param sent to Synology must be f'{item_id}_{cache_key}'."""
         client, main_mod, _, _ = app_client
-        db_row = {"cache_key": "MYKEY"}
-        cur = _make_cursor([db_row])
-        conn = _make_conn(cur)
-
         fake_resp = MagicMock()
         fake_resp.headers = {"Content-Type": "image/jpeg"}
-        fake_resp.iter_content.return_value = iter([b"\xff\xd8\xff"])
-
+        fake_resp.content = b"\xff\xd8\xff"
         sess = self._make_session()
         called_params = {}
         def capture_get(url, params=None, **kw):
             called_params.update(params or {})
             return fake_resp
-
-        with patch.object(main_mod, "db", return_value=conn), \
-             patch.object(main_mod, "get_session", return_value=sess), \
+        with patch.object(main_mod, "get_session", return_value=sess), \
              patch.object(main_mod.requests, "get", side_effect=capture_get):
-            client.get("/api/thumbnail/42")
-
+            client.get("/api/thumbnail/42/MYKEY")
         assert called_params["cache_key"] == "42_MYKEY"
         assert called_params["id"] == 42
 
@@ -460,7 +450,10 @@ class TestStreamMedia:
 
     def test_streams_media(self, app_client):
         client, main_mod, _, _ = app_client
-        db_row = {"filename": "photo.jpg"}
+        db_row = {
+            "filename": "photo.jpg", "item_type": 0,
+            "folder_name": "/Photos", "companion_filename": None, "companion_folder": None,
+        }
         cur = _make_cursor([db_row])
         conn = _make_conn(cur)
 

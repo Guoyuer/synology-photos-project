@@ -30,6 +30,7 @@ export interface MediaItem {
   item_type: number
   type_name: string
   filesize: number
+  cache_key: string
   width: number | null
   height: number | null
   duration: number | null
@@ -58,6 +59,8 @@ export interface MediaItem {
   description: string | null
   latitude: number | null
   longitude: number | null
+  companion_filename: string | null
+  companion_folder: string | null
 }
 
 export interface CollectResult {
