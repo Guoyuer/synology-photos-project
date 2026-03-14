@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useCallback } from 'react'
+import { useRef, useState, useMemo, useCallback, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { thumbnailUrl } from '../api'
 import { fmt, fmtDur, TYPE_BADGE } from '../utils'
@@ -15,6 +15,20 @@ interface Props {
   onToggle: (item: MediaItem) => void
   onSelectAll: (items: MediaItem[]) => void
   onClearAll: (ids: number[]) => void
+}
+
+// Only commit the src after the item has been visible for DELAY ms.
+// If the component unmounts before then (fast scroll), the timer is cleared
+// and no HTTP request is ever made.
+const SCROLL_DELAY_MS = 150
+
+function DeferredImg({ src, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const [activeSrc, setActiveSrc] = useState<string | undefined>()
+  useEffect(() => {
+    const t = setTimeout(() => setActiveSrc(src), SCROLL_DELAY_MS)
+    return () => clearTimeout(t)
+  }, [src])
+  return <img src={activeSrc} {...props} />
 }
 
 const ITEM_W = 172  // approximate grid item width + gap
@@ -128,7 +142,7 @@ export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, o
                       className={`relative rounded overflow-hidden cursor-pointer border-2 transition-all shrink-0
                         ${cartIds.has(item.id) ? 'border-blue-500' : 'border-transparent hover:border-gray-500'}`}
                     >
-                      <img
+                      <DeferredImg
                         src={thumbnailUrl(item.id, 'sm')}
                         alt={item.filename}
                         className="w-full h-32 object-cover bg-gray-800"
