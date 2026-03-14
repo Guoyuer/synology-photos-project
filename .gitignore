@@ -2,5 +2,14 @@ venv/
 .env
 __pycache__/
 *.pyc
+*.pyo
 .DS_Store
 downloads/
+
+# Frontend
+web/frontend/node_modules/
+web/frontend/dist/
+web/frontend/.vite/
+
+# Session cache
+~/.synology_photos_session
