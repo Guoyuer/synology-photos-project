@@ -129,7 +129,6 @@ def query_items(
     conditions = ["1=1"]
     params = []
     person_filter = ""
-    face_join = ""
 
     # --- Person filter (always intersection when multiple IDs given) ---
     if person_ids:
@@ -251,30 +250,34 @@ def query_items(
     elif has_gps is False:
         conditions.append("u.id_geocoding IS NULL")
     if person_count is not None:
-        # Pre-aggregate face table once; reference fc.face_count in WHERE
-        face_join = """
-        LEFT JOIN (
-            SELECT id_unit,
-                   count(DISTINCT id_person) FILTER (WHERE id_person IS NOT NULL)
-                   + count(*) FILTER (WHERE id_person IS NULL) AS face_count
-            FROM face
-            GROUP BY id_unit
-        ) fc ON fc.id_unit = u.id"""
+        # Correlated subqueries — avoids materializing the entire face table.
         if person_count == 'none':
-            conditions.append("fc.face_count IS NULL")
+            conditions.append("NOT EXISTS (SELECT 1 FROM face f WHERE f.id_unit = u.id)")
         elif person_count == '1':
-            conditions.append("fc.face_count = 1")
-        elif person_count == '2+':          # legacy / backward compat
-            conditions.append("fc.face_count >= 2")
+            conditions.append("(SELECT COUNT(*) FROM face f WHERE f.id_unit = u.id) = 1")
+        elif person_count == '2+':
+            conditions.append("(SELECT COUNT(*) FROM face f WHERE f.id_unit = u.id) >= 2")
         else:
             m = re.match(r'^(>=|=)(\d+)$', person_count)
             if m:
                 sql_op = '>=' if m.group(1) == '>=' else '='
-                conditions.append(f"fc.face_count {sql_op} %s")
+                conditions.append(f"(SELECT COUNT(*) FROM face f WHERE f.id_unit = u.id) {sql_op} %s")
                 params.append(int(m.group(2)))
 
+    # CTE finds matching IDs cheaply (no expensive joins), then we enrich only
+    # those rows. This lets LIMIT apply before the heavy LEFT JOINs, avoiding
+    # full-table SELECT DISTINCT which blocks early termination.
+    limit_clause = 'LIMIT %s' if limit else ''
     sql = f"""
-        SELECT DISTINCT
+        WITH ids AS (
+            SELECT u.id, u.takentime
+            FROM unit u
+            {person_filter}
+            WHERE {' AND '.join(conditions)}
+            ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}
+            {limit_clause}
+        )
+        SELECT
             u.id,
             u.filename,
             u.takentime,
@@ -309,30 +312,14 @@ def query_items(
             m.orientation,
             m.description,
             m.latitude,
-            m.longitude,
-            comp_la.companion_filename,
-            comp_la.companion_folder
-        FROM unit u
-        {person_filter}
-        {face_join}
+            m.longitude
+        FROM ids
+        JOIN unit u ON u.id = ids.id
         LEFT JOIN video_additional va ON va.id_unit = u.id
         LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
         LEFT JOIN folder f           ON f.id = u.id_folder
         LEFT JOIN metadata m         ON m.id_unit = u.id
-        LEFT JOIN live_additional la_m ON la_m.id_unit = u.id AND u.item_type = 3
-        LEFT JOIN LATERAL (
-            SELECT comp_u.filename AS companion_filename, f_comp.name AS companion_folder
-            FROM live_additional la_c
-            JOIN unit comp_u ON comp_u.id = la_c.id_unit
-                            AND comp_u.id != u.id
-                            AND (comp_u.filename ILIKE '%%.mov' OR comp_u.filename ILIKE '%%.mp4')
-            JOIN folder f_comp ON f_comp.id = comp_u.id_folder
-            WHERE la_c.grouping_key = la_m.grouping_key
-            LIMIT 1
-        ) comp_la ON la_m.id_unit IS NOT NULL
-        WHERE {' AND '.join(conditions)}
         ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}
-        {'LIMIT %s' if limit else ''}
     """
 
     if limit:

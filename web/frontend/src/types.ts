@@ -59,8 +59,6 @@ export interface MediaItem {
   description: string | null
   latitude: number | null
   longitude: number | null
-  companion_filename: string | null
-  companion_folder: string | null
 }
 
 export interface CollectResult {
