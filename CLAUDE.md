@@ -19,7 +19,7 @@ python cli.py persons
 python cli.py collect --persons "Alice" --from 2024-01-01 --download
 
 # Run the FastAPI backend (from repo root)
-cd web/api && uvicorn main:app --reload --port 8000
+cd web/api && uvicorn main:app --reload --port 8000 --reload-dir ../..
 
 # Run Python tests (from repo root)
 pytest tests/test_collect_unit.py        # unit tests for query_items SQL builder
