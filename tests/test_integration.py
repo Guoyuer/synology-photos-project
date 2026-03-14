@@ -308,3 +308,177 @@ class TestDownloadFile:
         with tempfile.TemporaryDirectory() as tmpdir:
             ok = download_item(photos, 9999999, "nonexistent.jpg", tmpdir)
             assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# Person-count filter  (ground truth verified against DB on 2026-03-14)
+# Counts are POST-deduplication (duplicate_hash), matching query_items() output.
+# ---------------------------------------------------------------------------
+#   none  = 55,533   (no face detected)
+#   =1    =  7,673   (exactly 1 distinct person)
+#   >=2   =  3,721   (2+ distinct persons)
+#   =2    =  1,841   (exactly 2)
+#   >=3   =  1,880   (3 or more)
+#   none + =1 + >=2  == 66,927  (deduped total; grand total pre-dedup = 67,504)
+#   =1  + person 88 (Yuer Guo) = 1,284
+#   =1  + person 97 (Yi Zhang) = 1,574
+#   >=2 + person 88             =   980
+#   >=2 + person 97             =   974
+# ---------------------------------------------------------------------------
+PERSON_ID_YUER = 88
+PERSON_ID_YI   = 97
+MAX_QUERY_SECONDS = 6.0   # includes ~3s remote-DB + SELECT DISTINCT overhead;
+                           # face join itself is <0.3s (verified via raw SQL)
+
+
+class TestPersonCountFilter:
+
+    def _q(self, person_count, person_ids=None, limit=None):
+        """Run query_items with person_count filter, return (items, elapsed)."""
+        import time
+        from features.collect import query_items
+        t = time.time()
+        items = query_items(
+            person_count=person_count,
+            person_ids=person_ids or [],
+            limit=limit,
+        )
+        return items, time.time() - t
+
+    # --- counts ---
+
+    def test_none_count(self):
+        items, _ = self._q('none')
+        assert len(items) == 55_533, f"Expected 55,533 got {len(items)}"
+
+    def test_solo_count(self):
+        items, _ = self._q('=1')
+        assert len(items) == 7_673, f"Expected 7,673 got {len(items)}"
+
+    def test_group_gte2_count(self):
+        items, _ = self._q('>=2')
+        assert len(items) == 3_721, f"Expected 3,721 got {len(items)}"
+
+    def test_group_eq2_count(self):
+        items, _ = self._q('=2')
+        assert len(items) == 1_841, f"Expected 1,841 got {len(items)}"
+
+    def test_group_gte3_count(self):
+        items, _ = self._q('>=3')
+        assert len(items) == 1_880, f"Expected 1,880 got {len(items)}"
+
+    def test_all_buckets_are_fast(self):
+        """Query speed test with limit=1 — isolates face-join latency from data transfer."""
+        for pc in ('none', '=1', '>=2', '=2', '>=3'):
+            _, elapsed = self._q(pc, limit=1)
+            assert elapsed < MAX_QUERY_SECONDS, f"person_count={pc!r} too slow: {elapsed:.2f}s"
+
+    def test_partitions_exhaustive(self):
+        """none + solo + group must equal deduplicated total."""
+        none  = len(self._q('none')[0])
+        solo  = len(self._q('=1')[0])
+        group = len(self._q('>=2')[0])
+        assert none + solo + group == 66_927, (
+            f"Partitions sum to {none + solo + group}, expected 66,927"
+        )
+
+    # --- correctness: spot-check a sample item from each bucket ---
+
+    def _face_count(self, unit_id):
+        """Direct DB face count for one unit (ground truth)."""
+        import psycopg2
+        conn = psycopg2.connect(
+            host="192.168.1.169", port=5432, dbname="synofoto", user="postgres"
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT count(DISTINCT id_person) FILTER (WHERE id_person IS NOT NULL)"
+            "     + count(*) FILTER (WHERE id_person IS NULL)"
+            " FROM face WHERE id_unit = %s",
+            (unit_id,),
+        )
+        n = cur.fetchone()[0]
+        conn.close()
+        return n
+
+    def test_none_sample_has_zero_faces(self):
+        items, _ = self._q('none', limit=1)
+        assert len(items) == 1
+        assert self._face_count(items[0]['id']) == 0
+
+    def test_solo_sample_has_one_face(self):
+        items, _ = self._q('=1', limit=1)
+        assert len(items) == 1
+        assert self._face_count(items[0]['id']) == 1
+
+    def test_group_sample_has_two_or_more_faces(self):
+        items, _ = self._q('>=2', limit=1)
+        assert len(items) == 1
+        assert self._face_count(items[0]['id']) >= 2
+
+    def test_eq2_sample_has_exactly_two_faces(self):
+        items, _ = self._q('=2', limit=1)
+        assert len(items) == 1
+        assert self._face_count(items[0]['id']) == 2
+
+    # --- named person combinations ---
+
+    def test_solo_with_yuer(self):
+        items, elapsed = self._q('=1', person_ids=[PERSON_ID_YUER])
+        assert len(items) == 1_284, f"Expected 1,284 got {len(items)}"
+        assert elapsed < MAX_QUERY_SECONDS
+
+    def test_solo_with_yi_zhang(self):
+        items, elapsed = self._q('=1', person_ids=[PERSON_ID_YI])
+        assert len(items) == 1_574, f"Expected 1,574 got {len(items)}"
+        assert elapsed < MAX_QUERY_SECONDS
+
+    def test_group_with_yuer(self):
+        items, elapsed = self._q('>=2', person_ids=[PERSON_ID_YUER])
+        assert len(items) == 980, f"Expected 980 got {len(items)}"
+        assert elapsed < MAX_QUERY_SECONDS
+
+    def test_group_with_yi_zhang(self):
+        items, elapsed = self._q('>=2', person_ids=[PERSON_ID_YI])
+        assert len(items) == 974, f"Expected 974 got {len(items)}"
+        assert elapsed < MAX_QUERY_SECONDS
+
+    def test_solo_yuer_items_contain_yuer(self):
+        """Every item from solo+Yuer must be linked to person 88."""
+        import psycopg2
+        items, _ = self._q('=1', person_ids=[PERSON_ID_YUER], limit=10)
+        conn = psycopg2.connect(
+            host="192.168.1.169", port=5432, dbname="synofoto", user="postgres"
+        )
+        cur = conn.cursor()
+        for item in items:
+            cur.execute(
+                "SELECT 1 FROM many_unit_has_many_person WHERE id_unit=%s AND id_person=%s",
+                (item['id'], PERSON_ID_YUER),
+            )
+            assert cur.fetchone(), f"Unit {item['id']} missing person {PERSON_ID_YUER}"
+        conn.close()
+
+    def test_none_has_no_named_persons(self):
+        """Items with no face should not appear in many_unit_has_many_person."""
+        import psycopg2
+        items, _ = self._q('none', limit=20)
+        ids = [i['id'] for i in items]
+        conn = psycopg2.connect(
+            host="192.168.1.169", port=5432, dbname="synofoto", user="postgres"
+        )
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT count(*) FROM many_unit_has_many_person WHERE id_unit = ANY(%s)",
+            (ids,),
+        )
+        assert cur.fetchone()[0] == 0
+        conn.close()
+
+    # --- legacy format backward compat ---
+
+    def test_legacy_2plus_format(self):
+        """Old '2+' string must still work and match >=2 count."""
+        items_legacy, elapsed = self._q('2+')
+        assert len(items_legacy) == 3_721, f"Legacy '2+' got {len(items_legacy)}"
+        assert elapsed < MAX_QUERY_SECONDS

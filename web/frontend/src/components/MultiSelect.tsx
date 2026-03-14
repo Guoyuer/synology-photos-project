@@ -12,9 +12,10 @@ interface Props {
   onChange: (values: (string | number)[]) => void
   placeholder?: string
   searchable?: boolean
+  disabled?: boolean
 }
 
-export function MultiSelect({ options, selected, onChange, placeholder = 'Select...', searchable = true }: Props) {
+export function MultiSelect({ options, selected, onChange, placeholder = 'Select...', searchable = true, disabled = false }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -41,8 +42,10 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'Select
     <div className="relative" ref={ref}>
       <button
         type="button"
-        onClick={() => setOpen(o => !o)}
-        className="w-full text-left px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200 flex justify-between items-center"
+        onClick={() => !disabled && setOpen(o => !o)}
+        disabled={disabled}
+        className={`w-full text-left px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm flex justify-between items-center
+          ${disabled ? 'opacity-40 cursor-not-allowed text-gray-500' : 'text-gray-200'}`}
       >
         <span className="truncate">{selected.length ? selectedLabels : <span className="text-gray-500">{placeholder}</span>}</span>
         <span className="ml-2 text-gray-400">▾</span>

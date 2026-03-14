@@ -22,7 +22,9 @@ python cli.py persons
 python cli.py collect --persons "Alice" --from 2024-01-01 --download
 
 # Run the FastAPI backend (from repo root)
-cd web/api && uvicorn main:app --reload --port 8000 --reload-dir ../..
+# Kill any existing instance first, then start in background
+lsof -ti:8000 | xargs kill -9 2>/dev/null; true
+source venv/bin/activate && cd web/api && uvicorn main:app --reload --port 8000 --reload-dir ../.. &
 
 # Run Python tests (from repo root)
 pytest tests/test_collect_unit.py        # unit tests for query_items SQL builder
@@ -33,11 +35,20 @@ pytest tests/ -k "not integration"      # skip integration tests
 
 ### Frontend
 ```bash
-cd web/frontend
-npm install
-npm run dev          # Vite dev server on :5173, proxies /api/* to localhost:8000
+# Kill any existing instance first, then start in background
+lsof -ti:5173 | xargs kill -9 2>/dev/null; true
+cd web/frontend && npm run dev &
+
 npm run build        # TypeScript check + production build
 npm run test:e2e     # Playwright E2E tests (requires: npm run dev running on :5174)
+```
+
+### Restart both servers (run from repo root)
+```bash
+lsof -ti:8000 | xargs kill -9 2>/dev/null; true
+lsof -ti:5173 | xargs kill -9 2>/dev/null; true
+source venv/bin/activate && cd web/api && uvicorn main:app --reload --port 8000 --reload-dir ../.. &
+cd web/frontend && npm run dev &
 ```
 
 The Playwright config expects the dev server on port **5174** (run with `-- --port 5174`), not the default 5173. E2E tests mock all API routes via `page.route()` — no backend needed.

@@ -132,19 +132,16 @@ class TestQueryItemsSQL:
 
     # -- Person filters ------------------------------------------------------
 
-    def test_person_ids_any_uses_exists(self, collect_mod, psycopg2_mock):
-        sql, params, _ = self._run(collect_mod, psycopg2_mock, person_ids=[1, 2], all_persons=False)
+    def test_person_ids_single_uses_exists(self, collect_mod, psycopg2_mock):
+        sql, params, _ = self._run(collect_mod, psycopg2_mock, person_ids=[1])
         assert "EXISTS" in sql
         assert "many_unit_has_many_person" in sql
-        assert "ANY(%s)" in sql
-        # person_ids list should be in params
-        assert [1, 2] in params
+        assert 1 in params
 
-    def test_person_ids_all_uses_joins(self, collect_mod, psycopg2_mock):
-        sql, params, _ = self._run(collect_mod, psycopg2_mock, person_ids=[1, 2], all_persons=True)
-        # Should have one JOIN per person
+    def test_person_ids_multiple_uses_joins(self, collect_mod, psycopg2_mock):
+        sql, params, _ = self._run(collect_mod, psycopg2_mock, person_ids=[1, 2])
+        # Should have one JOIN per person (intersection)
         assert sql.count("JOIN many_unit_has_many_person") == 2
-        assert "EXISTS" not in sql or "many_unit_has_many_person" not in sql.split("EXISTS")[0]
         assert 1 in params
         assert 2 in params
 

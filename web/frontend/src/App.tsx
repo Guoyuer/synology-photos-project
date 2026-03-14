@@ -8,7 +8,7 @@ import type { Camera, CollectRequest, CollectResult, Concept, Location, MediaIte
 function toRequest(f: FilterState): CollectRequest {
   return {
     person_ids: f.personIds,
-    all_persons: f.allPersons,
+    person_count: f.personCount || null,
     country: f.country || null,
     first_level: f.firstLevel || null,
     district: f.district || null,
@@ -32,7 +32,7 @@ function toRequest(f: FilterState): CollectRequest {
 
 function hasAnyFilter(f: FilterState): boolean {
   return (
-    f.personIds.length > 0 ||
+    f.personIds.length > 0 || !!f.personCount ||
     !!f.country || !!f.fromDate || !!f.toDate ||
     f.itemTypes.length > 0 ||
     f.selectedConcepts.length > 0 ||

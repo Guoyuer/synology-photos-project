@@ -45,18 +45,77 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
       {/* Persons */}
       <section>
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Persons</label>
-        <MultiSelect
-          options={persons.map(p => ({ value: p.id, label: p.name, sub: `${p.item_count}` }))}
-          selected={filters.personIds}
-          onChange={v => set('personIds', v as number[])}
-          placeholder="Any person..."
-        />
-        {filters.personIds.length > 1 && (
-          <label className="flex items-center gap-2 mt-2 text-xs text-gray-400 cursor-pointer">
-            <input type="checkbox" checked={filters.allPersons} onChange={e => set('allPersons', e.target.checked)} className="accent-blue-500" />
-            All must co-appear (intersection)
-          </label>
-        )}
+        {(() => {
+          const GROUP_RE = /^(>=|=)(\d+)$/
+          const gm = filters.personCount ? GROUP_RE.exec(filters.personCount) : null
+          const isGroup = !!gm
+          const groupOp = gm ? gm[1] : '>='
+          const groupN = gm ? parseInt(gm[2]) : 2
+          const setGroup = (op: string, n: number) =>
+            onFiltersChange({ ...filters, personCount: `${op}${n}` })
+          const isNone = filters.personCount === 'none'
+          const isSolo = filters.personCount === '1'
+
+          return (
+            <>
+              <div className="flex gap-1.5 mb-2">
+                {/* No face pill */}
+                {(['none', '1'] as const).map(v => {
+                  const active = filters.personCount === v
+                  return (
+                    <button key={v} type="button"
+                      onClick={() => onFiltersChange({
+                        ...filters,
+                        personCount: active ? '' : v,
+                        personIds: v === 'none' ? [] : v === '1' ? filters.personIds.slice(0, 1) : filters.personIds,
+                      })}
+                      className={`flex-1 py-1 rounded text-xs font-medium transition-colors
+                        ${active ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'}`}
+                    >
+                      {v === 'none' ? 'No face' : 'Solo'}
+                    </button>
+                  )
+                })}
+
+                {/* Group widget */}
+                <div
+                  onClick={() => !isGroup && setGroup(groupOp, groupN)}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded text-xs font-medium cursor-pointer transition-colors
+                    ${isGroup ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'}`}
+                >
+                  <select
+                    value={groupOp}
+                    onChange={e => { e.stopPropagation(); setGroup(e.target.value, groupN) }}
+                    onClick={e => e.stopPropagation()}
+                    className="bg-transparent outline-none cursor-pointer"
+                  >
+                    <option value=">=">≥</option>
+                    <option value="=">=</option>
+                  </select>
+                  <input
+                    type="number" min={2} value={groupN}
+                    onChange={e => setGroup(groupOp, Math.max(2, parseInt(e.target.value) || 2))}
+                    onClick={e => e.stopPropagation()}
+                    className="w-7 bg-transparent text-center outline-none"
+                  />
+                  <span>ppl</span>
+                </div>
+              </div>
+
+              <MultiSelect
+                options={persons.map(p => ({ value: p.id, label: p.name, sub: `${p.item_count}` }))}
+                selected={filters.personIds}
+                onChange={v => {
+                  const ids = v as number[]
+                  const next = isSolo ? ids.slice(-1) : ids
+                  onFiltersChange({ ...filters, personIds: next })
+                }}
+                placeholder="Any named person..."
+                disabled={isNone}
+              />
+            </>
+          )
+        })()}
       </section>
 
       {/* Has GPS */}

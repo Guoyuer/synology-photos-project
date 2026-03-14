@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 
 export interface FilterState {
   personIds: number[]
-  allPersons: boolean
+  personCount: string   // '' | 'none' | '1' | '2+'
   country: string
   firstLevel: string
   district: string
@@ -25,7 +25,7 @@ export interface FilterState {
 
 export const DEFAULT_FILTERS: FilterState = {
   personIds: [],
-  allPersons: false,
+  personCount: '',
   country: '',
   firstLevel: '',
   district: '',
@@ -50,7 +50,7 @@ function fromParams(p: URLSearchParams): FilterState {
   const conf = parseFloat(p.get('conf') ?? '')
   return {
     personIds: p.getAll('persons').map(Number).filter(n => !isNaN(n)),
-    allPersons: p.get('allPersons') === '1',
+    personCount: p.get('pcnt') ?? '',
     country: p.get('country') ?? '',
     firstLevel: p.get('city') ?? '',
     district: p.get('district') ?? '',
@@ -75,7 +75,7 @@ function fromParams(p: URLSearchParams): FilterState {
 export function toSearch(f: FilterState): string {
   const p = new URLSearchParams()
   f.personIds.forEach(id => p.append('persons', String(id)))
-  if (f.allPersons) p.set('allPersons', '1')
+  if (f.personCount) p.set('pcnt', f.personCount)
   if (f.country) p.set('country', f.country)
   if (f.firstLevel) p.set('city', f.firstLevel)
   if (f.district) p.set('district', f.district)

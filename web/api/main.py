@@ -138,7 +138,6 @@ def list_cameras():
 
 class CollectRequest(BaseModel):
     person_ids: list[int] = []
-    all_persons: bool = False
     country: Optional[str] = None
     first_level: Optional[str] = None
     district: Optional[str] = None
@@ -155,6 +154,7 @@ class CollectRequest(BaseModel):
     video_codecs: list[str] = []
     has_audio: Optional[bool] = None
     has_gps: Optional[bool] = None
+    person_count: Optional[str] = None   # 'none' | '1' | '2+'
     limit: Optional[int] = None
     sort_desc: bool = False
 
@@ -172,7 +172,6 @@ def collect(req: CollectRequest):
 
     items = query_items(
         person_ids=req.person_ids,
-        all_persons=req.all_persons,
         country=req.country,
         first_level=req.first_level,
         district=req.district,
@@ -189,6 +188,7 @@ def collect(req: CollectRequest):
         video_codecs=req.video_codecs,
         has_audio=req.has_audio,
         has_gps=req.has_gps,
+        person_count=req.person_count,
         limit=req.limit,
         sort_desc=req.sort_desc,
     )

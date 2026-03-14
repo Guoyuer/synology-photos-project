@@ -99,7 +99,6 @@ def query_items(
     from_ts: int | None = None,
     to_ts: int | None = None,
     item_types: list[int] = [],
-    all_persons: bool = False,
     country: str | None = None,          # filter by country name
     first_level: str | None = None,      # filter by state/city (first_level)
     district: str | None = None,         # filter by district/second_level name
@@ -113,6 +112,7 @@ def query_items(
     video_codecs: list[str] = [],        # ["hevc", "h264", "vp9"]
     has_audio: bool | None = None,       # True=must have audio, False=no audio
     has_gps: bool | None = None,         # True=must have GPS, False=no GPS
+    person_count: str | None = None,     # 'none' | '1' | '2+'
     limit: int | None = None,
     sort_desc: bool = False,
 ) -> list[dict]:
@@ -121,9 +121,7 @@ def query_items(
 
     Used by both the CLI (collect command) and the web API.
 
-    Person modes:
-      all_persons=False (default): items featuring ANY of the listed persons.
-      all_persons=True:            items where ALL listed persons co-appear.
+    When multiple person_ids are given, ALL must co-appear (intersection).
     """
     conn = _db_connect()
     cur = conn.cursor()
@@ -131,26 +129,28 @@ def query_items(
     conditions = ["1=1"]
     params = []
     person_filter = ""
+    face_join = ""
 
-    # --- Person filter ---
-    if all_persons and person_ids:
-        person_joins = ""
-        person_params = []
-        for i, pid in enumerate(person_ids):
-            alias = f"mp{i}"
-            person_joins += (
-                f" JOIN many_unit_has_many_person {alias}"
-                f" ON {alias}.id_unit = u.id AND {alias}.id_person = %s"
+    # --- Person filter (always intersection when multiple IDs given) ---
+    if person_ids:
+        if len(person_ids) == 1:
+            conditions.append(
+                "EXISTS (SELECT 1 FROM many_unit_has_many_person mp "
+                "WHERE mp.id_unit = u.id AND mp.id_person = %s)"
             )
-            person_params.append(pid)
-        params = person_params + params
-        person_filter = person_joins
-    elif person_ids:
-        conditions.append(
-            "EXISTS (SELECT 1 FROM many_unit_has_many_person mp "
-            "WHERE mp.id_unit = u.id AND mp.id_person = ANY(%s))"
-        )
-        params.append(person_ids)
+            params.append(person_ids[0])
+        else:
+            person_joins = ""
+            person_params = []
+            for i, pid in enumerate(person_ids):
+                alias = f"mp{i}"
+                person_joins += (
+                    f" JOIN many_unit_has_many_person {alias}"
+                    f" ON {alias}.id_unit = u.id AND {alias}.id_person = %s"
+                )
+                person_params.append(pid)
+            params = person_params + params
+            person_filter = person_joins
 
     # --- Location: explicit geocoding IDs (from resolve_location) ---
     if geocoding_ids:
@@ -250,6 +250,28 @@ def query_items(
         conditions.append("u.id_geocoding IS NOT NULL")
     elif has_gps is False:
         conditions.append("u.id_geocoding IS NULL")
+    if person_count is not None:
+        # Pre-aggregate face table once; reference fc.face_count in WHERE
+        face_join = """
+        LEFT JOIN (
+            SELECT id_unit,
+                   count(DISTINCT id_person) FILTER (WHERE id_person IS NOT NULL)
+                   + count(*) FILTER (WHERE id_person IS NULL) AS face_count
+            FROM face
+            GROUP BY id_unit
+        ) fc ON fc.id_unit = u.id"""
+        if person_count == 'none':
+            conditions.append("fc.face_count IS NULL")
+        elif person_count == '1':
+            conditions.append("fc.face_count = 1")
+        elif person_count == '2+':          # legacy / backward compat
+            conditions.append("fc.face_count >= 2")
+        else:
+            m = re.match(r'^(>=|=)(\d+)$', person_count)
+            if m:
+                sql_op = '>=' if m.group(1) == '>=' else '='
+                conditions.append(f"fc.face_count {sql_op} %s")
+                params.append(int(m.group(2)))
 
     sql = f"""
         SELECT DISTINCT
@@ -290,6 +312,7 @@ def query_items(
             m.longitude
         FROM unit u
         {person_filter}
+        {face_join}
         LEFT JOIN video_additional va ON va.id_unit = u.id
         LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
         LEFT JOIN folder f           ON f.id = u.id_folder
@@ -332,14 +355,13 @@ def _make_output_dir(persons: dict, location: str | None, from_date: str | None,
 
 def print_preview(items: list[dict], persons: dict, location: str | None,
                   from_date: str | None, to_date: str | None,
-                  item_type: str | None, output_dir: str,
-                  all_persons: bool = False) -> None:
+                  item_type: str | None, output_dir: str) -> None:
     total_bytes = sum(r["filesize"] or 0 for r in items)
     total_mb = total_bytes / 1024 / 1024
 
     print("\n=== Collect Preview ===")
     if persons:
-        sep = " ∩ " if all_persons else " + "
+        sep = " ∩ " if len(persons) > 1 else " + "
         persons_str = sep.join(f"{n} (ID:{i})" for i, n in persons.items())
         print(f"Persons:   {persons_str}")
     if location:
@@ -379,7 +401,6 @@ def collect(
     output_dir: str | None = None,
     download: bool = False,
     limit: int | None = None,
-    all_persons: bool = False,
     concepts: list[str] = [],
     min_confidence: float = 0.7,
     cameras: list[str] = [],
@@ -435,7 +456,6 @@ def collect(
         from_ts=from_ts,
         to_ts=to_ts,
         item_types=item_type_ints,
-        all_persons=all_persons,
         concepts=concepts,
         min_confidence=min_confidence,
         cameras=cameras,
@@ -455,7 +475,7 @@ def collect(
         output_dir = _make_output_dir(resolved_persons, location, from_date, to_date)
 
     type_label = ", ".join(item_types) if item_types else None
-    print_preview(items, resolved_persons, location, from_date, to_date, type_label, output_dir, all_persons)
+    print_preview(items, resolved_persons, location, from_date, to_date, type_label, output_dir)
 
     if not download or not items:
         return True

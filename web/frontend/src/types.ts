@@ -68,7 +68,7 @@ export interface CollectResult {
 
 export interface CollectRequest {
   person_ids: number[]
-  all_persons: boolean
+  person_count: string | null   // null | 'none' | '1' | '2+'
   country: string | null
   first_level: string | null
   district: string | null

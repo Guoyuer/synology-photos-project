@@ -114,7 +114,6 @@ def cmd_collect(args):
         output_dir=args.output,
         download=args.download,
         limit=args.limit,
-        all_persons=args.all_persons,
         concepts=args.concepts or [],
         min_confidence=args.min_confidence,
         cameras=args.cameras or [],
@@ -213,7 +212,6 @@ Examples:
     collect_parser.add_argument('--output', type=str, help='Output directory (auto-named if omitted)')
     collect_parser.add_argument('--download', action='store_true', help='Download files (preview only without this)')
     collect_parser.add_argument('--limit', type=int, help='Cap number of items')
-    collect_parser.add_argument('--all-persons', action='store_true', help='All persons must co-appear (default: any)')
     collect_parser.add_argument('--concepts', nargs='+', metavar='STEM', help='AI concept stems (e.g. food beach)')
     collect_parser.add_argument('--min-confidence', type=float, default=0.7, metavar='0-1', help='Min concept confidence (default: 0.7)')
     collect_parser.add_argument('--cameras', nargs='+', metavar='MODEL', help='Camera model names')

@@ -284,7 +284,6 @@ class TestCollect:
             return []
         payload = {
             "person_ids":    [1, 2],
-            "all_persons":   True,
             "country":       "France",
             "first_level":   "Paris",
             "district":      "Marais",
@@ -299,7 +298,6 @@ class TestCollect:
         with patch.object(main_mod, "query_items", side_effect=fake_query):
             client.post("/api/collect", json=payload)
         assert captured["person_ids"]    == [1, 2]
-        assert captured["all_persons"]   is True
         assert captured["country"]       == "France"
         assert captured["first_level"]   == "Paris"
         assert captured["district"]      == "Marais"
