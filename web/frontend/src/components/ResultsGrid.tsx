@@ -1,6 +1,7 @@
 import { useRef, useState, useMemo, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { thumbnailUrl } from '../api'
+import { fmt, fmtDur, TYPE_BADGE } from '../utils'
 import { ContextMenu } from './ContextMenu'
 import { Lightbox } from './Lightbox'
 import type { MediaItem } from '../types'
@@ -14,24 +15,6 @@ interface Props {
   onClearAll: (ids: number[]) => void
 }
 
-const TYPE_BADGE: Record<string, string> = {
-  photo: 'bg-blue-700',
-  video: 'bg-red-700',
-  live: 'bg-green-700',
-  motion: 'bg-purple-700',
-}
-
-function fmt(bytes: number) {
-  if (bytes > 1024 * 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB'
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
-}
-
-function fmtDur(ms: number | null) {
-  if (!ms) return ''
-  const s = Math.round(ms / 1000)
-  return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`
-}
-
 const ITEM_W = 172  // approximate grid item width + gap
 
 export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, onClearAll }: Props) {
@@ -39,17 +22,21 @@ export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, on
   const [preview, setPreview] = useState<MediaItem | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const roRef = useRef<ResizeObserver | null>(null)
   const [containerWidth, setContainerWidth] = useState(800)
 
   const containerRef = useCallback((node: HTMLDivElement | null) => {
+    if (roRef.current) {
+      roRef.current.disconnect()
+      roRef.current = null
+    }
     if (!node) return
     setContainerWidth(node.offsetWidth)
     const ro = new ResizeObserver(entries => {
       setContainerWidth(entries[0].contentRect.width)
     })
     ro.observe(node)
-    // store observer on element so it lives as long as the DOM node
-    ;(node as any)._ro = ro
+    roRef.current = ro
   }, [])
 
   const cols = Math.max(1, Math.floor((containerWidth - 16) / ITEM_W))

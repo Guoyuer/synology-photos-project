@@ -2,24 +2,26 @@ import type { Camera, CollectRequest, CollectResult, Concept, Location, Person }
 
 const BASE = '/api'
 
-export async function fetchPersons(): Promise<Person[]> {
-  const res = await fetch(`${BASE}/persons`)
+async function apiFetch<T>(url: string): Promise<T> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
 
-export async function fetchLocations(): Promise<Location[]> {
-  const res = await fetch(`${BASE}/locations`)
-  return res.json()
+export function fetchPersons(): Promise<Person[]> {
+  return apiFetch(`${BASE}/persons`)
 }
 
-export async function fetchConcepts(): Promise<Concept[]> {
-  const res = await fetch(`${BASE}/concepts`)
-  return res.json()
+export function fetchLocations(): Promise<Location[]> {
+  return apiFetch(`${BASE}/locations`)
 }
 
-export async function fetchCameras(): Promise<Camera[]> {
-  const res = await fetch(`${BASE}/cameras`)
-  return res.json()
+export function fetchConcepts(): Promise<Concept[]> {
+  return apiFetch(`${BASE}/concepts`)
+}
+
+export function fetchCameras(): Promise<Camera[]> {
+  return apiFetch(`${BASE}/cameras`)
 }
 
 export async function runCollect(req: CollectRequest): Promise<CollectResult> {

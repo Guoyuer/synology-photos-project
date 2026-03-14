@@ -1,26 +1,12 @@
 import { useState } from 'react'
 import { downloadItems, thumbnailUrl } from '../api'
+import { fmt, fmtDur, TYPE_BADGE } from '../utils'
 import type { MediaItem } from '../types'
 
 interface Props {
   cart: MediaItem[]
   onClear: () => void
   onRemove: (id: number) => void
-}
-
-function fmt(bytes: number) {
-  if (bytes >= 1024 * 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB'
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
-}
-
-function fmtDur(ms: number | null) {
-  if (!ms) return ''
-  const s = Math.round(ms / 1000)
-  return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`
-}
-
-const TYPE_BADGE: Record<string, string> = {
-  photo: 'bg-blue-700', video: 'bg-red-700', live: 'bg-green-700', motion: 'bg-purple-700',
 }
 
 export function CartBar({ cart, onClear, onRemove }: Props) {

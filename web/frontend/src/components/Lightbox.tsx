@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { mediaUrl } from '../api'
+import { fmt, fmtDur } from '../utils'
 import type { MediaItem } from '../types'
 
 interface Props {
@@ -7,17 +8,6 @@ interface Props {
   items: MediaItem[]
   onClose: () => void
   onNav: (item: MediaItem) => void
-}
-
-function fmt(bytes: number) {
-  if (bytes >= 1024 * 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB'
-  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
-}
-
-function fmtDur(ms: number | null) {
-  if (!ms) return ''
-  const s = Math.round(ms / 1000)
-  return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`
 }
 
 export function Lightbox({ item, items, onClose, onNav }: Props) {
@@ -64,22 +54,13 @@ export function Lightbox({ item, items, onClose, onNav }: Props) {
       {/* Media */}
       <div className="flex-1 flex items-center justify-center min-h-0 relative"
         onClick={onClose}>
-        {isVideo ? (
+        {isVideo || isLive ? (
           <video
             key={item.id}
-            src={mediaUrl(item.id)}
+            src={mediaUrl(item.id, isLive)}
             controls
             autoPlay
-            className="max-w-full max-h-full"
-            onClick={e => e.stopPropagation()}
-          />
-        ) : isLive ? (
-          <video
-            key={item.id}
-            src={mediaUrl(item.id, true)}
-            controls
-            autoPlay
-            loop
+            loop={isLive}
             className="max-w-full max-h-full"
             onClick={e => e.stopPropagation()}
           />

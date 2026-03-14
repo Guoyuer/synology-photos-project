@@ -3,7 +3,7 @@
 
 def list_folders(photos, limit=None):
     """List all folders."""
-    folders = photos.list_folders(limit=100)
+    folders = photos.list_folders(limit=limit or 100)
 
     if not folders.get('success'):
         print("❌ Failed to list folders")
@@ -18,14 +18,10 @@ def list_folders(photos, limit=None):
         print("No folders found")
         return True
 
-    display_count = limit if limit else len(folder_list)
-    for folder in folder_list[:display_count]:
+    for folder in folder_list:
         parent_id = folder.get('parent', 'root')
         shared = "🔒 Shared" if folder.get('shared') else ""
         print(f"  - {folder['name']} (ID: {folder['id']}) {shared}".strip())
-
-    if limit and len(folder_list) > limit:
-        print(f"  ... and {len(folder_list) - limit} more")
 
     return True
 

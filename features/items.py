@@ -6,7 +6,7 @@ def list_items_in_folder(photos, folder_id, limit=None):
     try:
         items = photos.list_item_in_folders(
             folder_id=folder_id,
-            limit=100,
+            limit=limit or 100,
             additional=["person", "thumbnail"]
         )
 
@@ -23,17 +23,13 @@ def list_items_in_folder(photos, folder_id, limit=None):
             print("No items found")
             return True
 
-        display_count = limit if limit else len(item_list)
-        for item in item_list[:display_count]:
+        for item in item_list:
             filename = item.get('filename', 'Unknown')
             item_type = item.get('item_type', 'unknown')
             time_str = ""
             if 'takentime' in item:
                 time_str = f" [{item['takentime']}]"
             print(f"  - {filename} ({item_type}){time_str}")
-
-        if limit and len(item_list) > limit:
-            print(f"  ... and {len(item_list) - limit} more")
 
         return True
 

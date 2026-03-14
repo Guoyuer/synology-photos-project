@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """Utility to manage Synology Photos API session."""
 
-import sys
 from datetime import datetime, timedelta
 from session_manager import (
     clear_session, load_session_from_file, SESSION_FILE,
@@ -76,23 +75,3 @@ def show_status():
     print(f"Syno Token: {session['syno_token']}")
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python manage_session.py [clear|status]")
-        print("\nCommands:")
-        print("  clear   - Clear the saved session")
-        print("  status  - Show current session status")
-        return
-
-    command = sys.argv[1].lower()
-
-    if command == 'clear':
-        clear_session()
-    elif command == 'status':
-        show_status()
-    else:
-        print(f"Unknown command: {command}")
-
-
-if __name__ == '__main__':
-    main()
