@@ -235,32 +235,111 @@ def download_files(req: DownloadRequest):
 # Full-resolution media stream (for lightbox preview)
 # ---------------------------------------------------------------------------
 
+def _filestation_stream(folder_name: str, filename: str, content_type: str):
+    """Stream a file from Synology via FileStation API (for companion/embedded videos)."""
+    import json as _json
+    photos = get_session()
+    url = photos.session._base_url + "entry.cgi"
+    fs_path = f"/home/Photos{folder_name}/{filename}"
+    resp = requests.get(
+        url,
+        params={
+            "api": "SYNO.FileStation.Download",
+            "method": "download",
+            "version": "2",
+            "path": _json.dumps([fs_path]),
+            "mode": "open",
+            "SynoToken": photos.session.syno_token,
+            "_sid": photos.session.sid,
+        },
+        verify=photos.session._verify,
+        stream=True,
+        timeout=300,
+    )
+    return StreamingResponse(resp.iter_content(chunk_size=65536), media_type=content_type)
+
+
 @app.get("/api/media/{item_id}")
-def stream_media(item_id: int):
+def stream_media(item_id: int, as_video: bool = False):
     import json as _json, mimetypes
     conn = db()
     cur = conn.cursor()
-    cur.execute("SELECT filename FROM unit WHERE id = %s", (item_id,))
+    cur.execute("""
+        SELECT u.filename, u.item_type, f.name AS folder_name
+        FROM unit u JOIN folder f ON f.id = u.id_folder
+        WHERE u.id = %s
+    """, (item_id,))
     row = cur.fetchone()
-    conn.close()
+
     if not row:
+        conn.close()
         raise HTTPException(status_code=404, detail="Item not found")
 
+    if as_video:
+        if row["item_type"] == 3:  # live photo — find companion MOV/MP4 unit
+            cur.execute("""
+                SELECT u.filename, f.name AS folder_name
+                FROM live_additional la
+                JOIN unit u ON u.id = la.id_unit
+                JOIN folder f ON f.id = u.id_folder
+                WHERE la.grouping_key = (
+                    SELECT grouping_key FROM live_additional WHERE id_unit = %s
+                )
+                AND u.id != %s
+                AND (u.filename ILIKE %s OR u.filename ILIKE %s)
+                LIMIT 1
+            """, (item_id, item_id, '%.mov', '%.mp4'))
+            companion = cur.fetchone()
+            conn.close()
+            if companion:
+                return _filestation_stream(companion["folder_name"], companion["filename"], "video/mp4")
+
+        elif row["item_type"] == 6:  # motion photo — download JPEG and extract embedded MP4
+            folder_name, filename = row["folder_name"], row["filename"]
+            conn.close()
+            photos = get_session()
+            url = photos.session._base_url + "entry.cgi"
+            fs_path = f"/home/Photos{folder_name}/{filename}"
+            resp = requests.get(
+                url,
+                params={
+                    "api": "SYNO.FileStation.Download",
+                    "method": "download",
+                    "version": "2",
+                    "path": _json.dumps([fs_path]),
+                    "mode": "open",
+                    "SynoToken": photos.session.syno_token,
+                    "_sid": photos.session.sid,
+                },
+                verify=photos.session._verify,
+                timeout=300,
+            )
+            data = resp.content
+            idx = data.rfind(b'ftyp')
+            if idx >= 4:
+                from fastapi.responses import Response
+                return Response(content=data[idx - 4:], media_type="video/mp4")
+
+        else:
+            conn.close()
+    else:
+        conn.close()
+
+    # Default: stream source via SYNO.Foto.Download
     photos = get_session()
     url = photos.session._base_url + "entry.cgi"
-    data = {
-        "api": "SYNO.Foto.Download",
-        "method": "download",
-        "version": "2",
-        "item_id": _json.dumps([item_id]),
-        "download_type": "source",
-        "force_download": "true",
-        "_sid": photos.session.sid,
-    }
     resp = requests.post(
         url,
         params={"SynoToken": photos.session.syno_token},
-        data=data,
+        data={
+            "api": "SYNO.Foto.Download",
+            "method": "download",
+            "version": "2",
+            "item_id": _json.dumps([item_id]),
+            "download_type": "source",
+            "force_download": "true",
+            "_sid": photos.session.sid,
+        },
         verify=photos.session._verify,
         stream=True,
         timeout=300,

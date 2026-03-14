@@ -24,7 +24,9 @@ export function Lightbox({ item, items, onClose, onNav }: Props) {
   const idx = items.findIndex(i => i.id === item.id)
   const prev = idx > 0 ? items[idx - 1] : null
   const next = idx < items.length - 1 ? items[idx + 1] : null
+  // type 1=video, 3=live photo, 6=motion photo — all have a playable video component
   const isVideo = item.item_type === 1
+  const isLive = item.item_type === 3 || item.item_type === 6
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -68,6 +70,16 @@ export function Lightbox({ item, items, onClose, onNav }: Props) {
             src={mediaUrl(item.id)}
             controls
             autoPlay
+            className="max-w-full max-h-full"
+            onClick={e => e.stopPropagation()}
+          />
+        ) : isLive ? (
+          <video
+            key={item.id}
+            src={mediaUrl(item.id, true)}
+            controls
+            autoPlay
+            loop
             className="max-w-full max-h-full"
             onClick={e => e.stopPropagation()}
           />
