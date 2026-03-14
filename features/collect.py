@@ -104,45 +104,40 @@ def resolve_location(query: str) -> list[int]:
 
 
 def query_items(
-    person_ids: list[int],
-    geocoding_ids: list[int],
-    from_ts: int | None,
-    to_ts: int | None,
-    item_type: int | None,
+    person_ids: list[int] = [],
+    geocoding_ids: list[int] = [],
+    from_ts: int | None = None,
+    to_ts: int | None = None,
+    item_type: int | None = None,        # single type (CLI convenience)
+    item_types: list[int] = [],          # multiple types (web UI)
     all_persons: bool = False,
+    country: str | None = None,          # filter by country name
+    district: str | None = None,         # filter by district/second_level name
+    concepts: list[str] = [],            # AI concept stems
+    min_confidence: float = 0.7,
+    cameras: list[str] = [],             # camera model names
+    min_duration_s: int | None = None,   # minimum video duration in seconds
+    min_width: int | None = None,        # minimum video width (e.g. 3840 for 4K)
+    limit: int | None = None,
 ) -> list[dict]:
     """
-    Run the SQL query and return matched items.
+    Core query function — single source of truth for all item filtering.
 
-    all_persons=False (default): items featuring ANY of the listed persons (UNION).
-    all_persons=True:            items where ALL listed persons co-appear (intersection).
+    Used by both the CLI (collect command) and the web API.
+
+    Person modes:
+      all_persons=False (default): items featuring ANY of the listed persons.
+      all_persons=True:            items where ALL listed persons co-appear.
     """
     conn = _db_connect()
     cur = conn.cursor()
 
     conditions = ["1=1"]
     params = []
+    person_filter = ""
 
-    # Location filter
-    if geocoding_ids:
-        conditions.append("u.id_geocoding = ANY(%s)")
-        params.append(geocoding_ids)
-
-    # Date range
-    if from_ts is not None:
-        conditions.append("u.takentime >= %s")
-        params.append(from_ts)
-    if to_ts is not None:
-        conditions.append("u.takentime <= %s")
-        params.append(to_ts)
-
-    # Type filter
-    if item_type is not None:
-        conditions.append("u.item_type = %s")
-        params.append(item_type)
-
+    # --- Person filter ---
     if all_persons and person_ids:
-        # Intersection: one JOIN per person — all must appear in same unit
         person_joins = ""
         person_params = []
         for i, pid in enumerate(person_ids):
@@ -152,19 +147,79 @@ def query_items(
                 f" ON {alias}.id_unit = u.id AND {alias}.id_person = %s"
             )
             person_params.append(pid)
-        # Person JOIN params come before WHERE params in SQL
         params = person_params + params
         person_filter = person_joins
     elif person_ids:
-        # Union: any of the listed persons
-        conditions.append("EXISTS ("
-            "SELECT 1 FROM many_unit_has_many_person mp "
-            "WHERE mp.id_unit = u.id AND mp.id_person = ANY(%s)"
-            ")")
+        conditions.append(
+            "EXISTS (SELECT 1 FROM many_unit_has_many_person mp "
+            "WHERE mp.id_unit = u.id AND mp.id_person = ANY(%s))"
+        )
         params.append(person_ids)
-        person_filter = ""
-    else:
-        person_filter = ""
+
+    # --- Location: explicit geocoding IDs (from resolve_location) ---
+    if geocoding_ids:
+        conditions.append("u.id_geocoding = ANY(%s)")
+        params.append(geocoding_ids)
+
+    # --- Location: country / district by name ---
+    if country:
+        loc_cond = "gi2.country = %s"
+        loc_params = [country]
+        if district:
+            loc_cond += " AND gi2.second_level = %s"
+            loc_params.append(district)
+        conditions.append(
+            f"EXISTS (SELECT 1 FROM geocoding_info gi2 "
+            f"WHERE gi2.id_geocoding = u.id_geocoding AND gi2.lang = 0 AND {loc_cond})"
+        )
+        params.extend(loc_params)
+
+    # --- Date range ---
+    if from_ts is not None:
+        conditions.append("u.takentime >= %s")
+        params.append(from_ts)
+    if to_ts is not None:
+        conditions.append("u.takentime <= %s")
+        params.append(to_ts)
+
+    # --- Item type (single or multiple) ---
+    effective_types = list(item_types)
+    if item_type is not None and item_type not in effective_types:
+        effective_types.append(item_type)
+    if effective_types:
+        conditions.append("u.item_type = ANY(%s)")
+        params.append(effective_types)
+
+    # --- AI concepts ---
+    if concepts:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM many_unit_has_many_concept mc "
+            "JOIN concept c ON c.id = mc.id_concept "
+            "WHERE mc.id_unit = u.id AND c.stem = ANY(%s) AND mc.confidence >= %s)"
+        )
+        params.extend([concepts, min_confidence])
+
+    # --- Camera ---
+    if cameras:
+        conditions.append(
+            "EXISTS (SELECT 1 FROM metadata m WHERE m.id_unit = u.id AND m.camera = ANY(%s))"
+        )
+        params.append(cameras)
+
+    # --- Video filters ---
+    if min_duration_s is not None:
+        conditions.append(
+            "(u.item_type != 1 OR EXISTS "
+            "(SELECT 1 FROM video_additional va2 WHERE va2.id_unit = u.id AND va2.duration >= %s))"
+        )
+        params.append(min_duration_s * 1000)
+    if min_width is not None:
+        conditions.append(
+            "(u.item_type != 1 OR EXISTS "
+            "(SELECT 1 FROM video_additional va3 WHERE va3.id_unit = u.id "
+            "AND (va3.video_info->>'resolution_x')::int >= %s))"
+        )
+        params.append(min_width)
 
     sql = f"""
         SELECT DISTINCT
@@ -174,31 +229,35 @@ def query_items(
             u.item_type,
             u.filesize,
             u.duplicate_hash,
-            (u.resolution->>'width')::int  AS width,
-            (u.resolution->>'height')::int AS height,
+            (u.resolution->>'width')::int   AS width,
+            (u.resolution->>'height')::int  AS height,
             va.duration,
-            (va.video_info->>'resolution_x')::int AS vres_x,
+            (va.video_info->>'resolution_x')::int  AS vres_x,
+            (va.video_info->>'frame_rate_num')::int AS fps,
             gi.country,
-            gi.second_level AS district
+            gi.second_level AS district,
+            m.camera,
+            m.latitude,
+            m.longitude
         FROM unit u
         {person_filter}
         LEFT JOIN video_additional va ON va.id_unit = u.id
-        LEFT JOIN geocoding_info gi ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
+        LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
+        LEFT JOIN metadata m         ON m.id_unit = u.id
         WHERE {' AND '.join(conditions)}
         ORDER BY u.takentime
+        {'LIMIT ' + str(limit) if limit else ''}
     """
 
     cur.execute(sql, params)
     cols = [d[0] for d in cur.description]
-    seen_hash = set()
-    seen_id = set()
+    seen = set()
     rows = []
     for row in cur.fetchall():
         d = dict(zip(cols, row))
-        dedup_key = d.get("duplicate_hash") or d["id"]
-        if dedup_key not in seen_hash and d["id"] not in seen_id:
-            seen_hash.add(dedup_key)
-            seen_id.add(d["id"])
+        key = d.get("duplicate_hash") or d["id"]
+        if key not in seen:
+            seen.add(key)
             rows.append(d)
     conn.close()
     return rows
@@ -313,10 +372,8 @@ def collect(
         to_ts=to_ts,
         item_type=item_type_int,
         all_persons=all_persons,
+        limit=limit,
     )
-
-    if limit:
-        items = items[:limit]
 
     # Auto-name output dir
     if not output_dir:
