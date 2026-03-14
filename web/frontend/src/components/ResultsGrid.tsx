@@ -32,6 +32,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
   const [downloading, setDownloading] = useState(false)
   const [dlError, setDlError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const cartScrollRef = useRef<HTMLDivElement>(null)
   const roRef = useRef<ResizeObserver | null>(null)
   const [containerWidth, setContainerWidth] = useState(800)
 
@@ -65,6 +66,13 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
     getScrollElement: () => scrollRef.current,
     estimateSize: () => 44,
     overscan: 10,
+  })
+
+  const cartVirtualizer = useVirtualizer({
+    count: cart.length,
+    getScrollElement: () => cartScrollRef.current,
+    estimateSize: () => 56,
+    overscan: 5,
   })
 
   const openCtxMenu = (e: React.MouseEvent, item: MediaItem) => {
@@ -134,25 +142,31 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
       {/* Cart dropdown */}
       {cartExpanded && cart.length > 0 && (
         <div className="shrink-0 bg-gray-900 border-b border-yellow-700/40">
-          <div className="max-h-56 overflow-y-auto">
-            {cart.map(item => (
-              <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-800 border-b border-gray-800">
-                <img src={thumbnailUrl(item.id, item.cache_key, 'sm')} className="w-10 h-10 object-cover rounded bg-gray-700 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-gray-200 truncate font-mono">{item.filename}</p>
-                  <p className="text-xs text-gray-500">
-                    <span className={`inline px-1 py-0.5 rounded text-white mr-1 ${TYPE_BADGE[item.type_name] ?? 'bg-gray-700'}`}>
-                      {item.type_name}
-                    </span>
-                    {fmt(item.filesize)}
-                    {item.duration ? ` · ${fmtDur(item.duration)}` : ''}
-                    {item.taken_iso ? ` · ${item.taken_iso.slice(0, 10)}` : ''}
-                  </p>
-                </div>
-                <button onClick={() => onRemoveFromCart(item.id)}
-                  className="text-gray-600 hover:text-red-400 text-lg leading-none px-1 transition-colors">×</button>
-              </div>
-            ))}
+          <div ref={cartScrollRef} className="max-h-56 overflow-y-auto">
+            <div style={{ height: cartVirtualizer.getTotalSize(), position: 'relative' }}>
+              {cartVirtualizer.getVirtualItems().map(vitem => {
+                const item = cart[vitem.index]
+                return (
+                  <div key={item.id} style={{ position: 'absolute', top: vitem.start, left: 0, right: 0 }}
+                    className="flex items-center gap-3 px-4 py-2 hover:bg-gray-800 border-b border-gray-800">
+                    <img src={thumbnailUrl(item.id, item.cache_key, 'sm')} className="w-10 h-10 object-cover rounded bg-gray-700 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-gray-200 truncate font-mono">{item.filename}</p>
+                      <p className="text-xs text-gray-500">
+                        <span className={`inline px-1 py-0.5 rounded text-white mr-1 ${TYPE_BADGE[item.type_name] ?? 'bg-gray-700'}`}>
+                          {item.type_name}
+                        </span>
+                        {fmt(item.filesize)}
+                        {item.duration ? ` · ${fmtDur(item.duration)}` : ''}
+                        {item.taken_iso ? ` · ${item.taken_iso.slice(0, 10)}` : ''}
+                      </p>
+                    </div>
+                    <button onClick={() => onRemoveFromCart(item.id)}
+                      className="text-gray-600 hover:text-red-400 text-lg leading-none px-1 transition-colors">×</button>
+                  </div>
+                )
+              })}
+            </div>
           </div>
           <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-700">
             {dlError && <span className="text-red-400 text-xs flex-1">{dlError}</span>}
