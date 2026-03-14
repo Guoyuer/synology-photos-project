@@ -23,6 +23,8 @@ interface Props {
 
 export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([])
+  // Forced top-level granularity when user navigates "back" from auto-detected level
+  const [topGran, setTopGran] = useState<Granularity | null>(null)
 
   const currentDrill = drillStack.length > 0 ? drillStack[drillStack.length - 1] : null
 
@@ -30,19 +32,17 @@ export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
     if (currentDrill) {
       return computeBins(items, currentDrill.gran, currentDrill.filterRange)
     }
-    return computeBins(items)
-  }, [items, currentDrill])
+    return computeBins(items, topGran ?? undefined)
+  }, [items, currentDrill, topGran])
 
   const handleClick = useCallback((bin: Bin) => {
     if (gran === 'year') {
-      // Drill into quarters of that year
       setDrillStack(prev => [...prev, {
         gran: 'quarter',
         filterRange: { from: bin.fromDate, to: bin.toDate },
         label: bin.label,
       }])
     } else if (gran === 'quarter') {
-      // Drill into months of that quarter
       setDrillStack(prev => [...prev, {
         gran: 'month',
         filterRange: { from: bin.fromDate, to: bin.toDate },
@@ -56,10 +56,21 @@ export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
   }, [gran, onDateFilter, onScrollTo])
 
   const handleBack = useCallback(() => {
-    setDrillStack(prev => prev.slice(0, -1))
-  }, [])
+    if (drillStack.length > 0) {
+      setDrillStack(prev => prev.slice(0, -1))
+    } else {
+      // At top level — zoom out to coarser granularity
+      if (gran === 'month') setTopGran('quarter')
+      else if (gran === 'quarter') { setTopGran(null) } // 'year' is default
+    }
+  }, [drillStack, gran])
 
-  if (!bins.length && !currentDrill) return null
+  const canGoBack = drillStack.length > 0 || gran !== 'year'
+  const backLabel = currentDrill
+    ? (drillStack.length > 1 ? drillStack[drillStack.length - 2].label : 'All')
+    : 'All'
+
+  if (!bins.length && !canGoBack) return null
 
   const binH = bins.length > 0 ? Math.max(4, Math.min(32, Math.floor(600 / bins.length))) : 0
 
@@ -67,15 +78,15 @@ export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
     <div className="w-12 shrink-0 flex flex-col overflow-y-auto bg-gray-900 border-l border-gray-800 select-none"
       style={{ scrollbarWidth: 'none' }}>
 
-      {/* Back/up button when drilled down */}
-      {currentDrill && (
+      {/* Back/up button — shown at every non-year level */}
+      {canGoBack && (
         <button
           onClick={handleBack}
-          title={`Back to ${drillStack.length > 1 ? drillStack[drillStack.length - 2].label : 'all'}`}
+          title={`Back to ${backLabel}`}
           className="shrink-0 flex items-center justify-center h-6 text-[9px] text-blue-400 hover:text-blue-300 hover:bg-gray-800 border-b border-gray-800 transition-colors gap-0.5"
         >
           <span>{'<'}</span>
-          <span className="truncate">{currentDrill.label}</span>
+          <span className="truncate">{backLabel}</span>
         </button>
       )}
 
