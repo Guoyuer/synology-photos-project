@@ -32,6 +32,10 @@ export async function runCollect(req: CollectRequest): Promise<CollectResult> {
   return res.json()
 }
 
+export function mediaUrl(id: number) {
+  return `${BASE}/media/${id}`
+}
+
 export function thumbnailUrl(id: number, size: 'sm' | 'md' | 'lg' = 'sm') {
   return `${BASE}/thumbnail/${id}?size=${size}`
 }

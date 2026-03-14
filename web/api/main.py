@@ -232,6 +232,47 @@ def download_files(req: DownloadRequest):
 
 
 # ---------------------------------------------------------------------------
+# Full-resolution media stream (for lightbox preview)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/media/{item_id}")
+def stream_media(item_id: int):
+    import json as _json, mimetypes
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("SELECT filename FROM unit WHERE id = %s", (item_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    photos = get_session()
+    url = photos.session._base_url + "entry.cgi"
+    data = {
+        "api": "SYNO.Foto.Download",
+        "method": "download",
+        "version": "2",
+        "item_id": _json.dumps([item_id]),
+        "download_type": "source",
+        "force_download": "true",
+        "_sid": photos.session.sid,
+    }
+    resp = requests.post(
+        url,
+        params={"SynoToken": photos.session.syno_token},
+        data=data,
+        verify=photos.session._verify,
+        stream=True,
+        timeout=300,
+    )
+    content_type, _ = mimetypes.guess_type(row["filename"])
+    return StreamingResponse(
+        resp.iter_content(chunk_size=65536),
+        media_type=content_type or "application/octet-stream",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Thumbnail proxy
 # ---------------------------------------------------------------------------
 

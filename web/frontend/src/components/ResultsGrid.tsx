@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { thumbnailUrl } from '../api'
+import { Lightbox } from './Lightbox'
 import type { MediaItem } from '../types'
 
 interface Props {
@@ -31,6 +32,7 @@ function fmtDur(ms: number | null) {
 
 export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, onClearAll }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
+  const [preview, setPreview] = useState<MediaItem | null>(null)
 
   const selectedInView = items.filter(i => cartIds.has(i.id))
   const selectedBytes = selectedInView.reduce((s, i) => s + (i.filesize || 0), 0)
@@ -72,6 +74,7 @@ export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, on
               <div
                 key={item.id}
                 onClick={() => onToggle(item)}
+                onDoubleClick={() => setPreview(item)}
                 className={`relative rounded overflow-hidden cursor-pointer border-2 transition-all
                   ${cartIds.has(item.id) ? 'border-blue-500' : 'border-transparent hover:border-gray-500'}`}
               >
@@ -120,6 +123,7 @@ export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, on
               {items.map(item => (
                 <tr key={item.id}
                   onClick={() => onToggle(item)}
+                  onDoubleClick={() => setPreview(item)}
                   className={`border-b border-gray-800 cursor-pointer ${cartIds.has(item.id) ? 'bg-blue-900/30' : 'hover:bg-gray-800'}`}
                 >
                   <td className="py-2 pr-3 font-mono text-xs max-w-xs truncate">{item.filename}</td>
@@ -144,6 +148,15 @@ export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, on
           </table>
         )}
       </div>
+
+      {preview && (
+        <Lightbox
+          item={preview}
+          items={items}
+          onClose={() => setPreview(null)}
+          onNav={setPreview}
+        />
+      )}
     </div>
   )
 }
