@@ -142,7 +142,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
       {/* Cart dropdown */}
       {cartExpanded && cart.length > 0 && (
         <div className="shrink-0 bg-gray-900 border-b border-yellow-700/40">
-          <div ref={cartScrollRef} className="max-h-56 overflow-y-auto">
+          <div ref={cartScrollRef} className="max-h-56 overflow-y-scroll">
             <div style={{ height: cartVirtualizer.getTotalSize(), position: 'relative' }}>
               {cartVirtualizer.getVirtualItems().map(vitem => {
                 const item = cart[vitem.index]
