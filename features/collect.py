@@ -367,20 +367,32 @@ def print_preview(items: list[dict], persons: dict, location: str | None,
 
 
 def collect(
-    photos,                        # Photos API instance (for download)
+    photos,                              # Photos API instance (for download)
     persons: list[str] | None = None,
     location: str | None = None,
-    from_date: str | None = None,  # "YYYY-MM-DD"
+    from_date: str | None = None,        # "YYYY-MM-DD"
     to_date: str | None = None,
-    item_type: str | None = None,  # "photo", "video", "live", "motion"
+    item_types: list[str] = [],          # ["photo","video","live","motion"]
     output_dir: str | None = None,
     download: bool = False,
     limit: int | None = None,
-    all_persons: bool = False,     # True = all must co-appear; False = any
+    all_persons: bool = False,
+    concepts: list[str] = [],
+    min_confidence: float = 0.7,
+    cameras: list[str] = [],
+    min_duration: int | None = None,     # seconds
+    max_duration: int | None = None,     # seconds
+    min_width: int | None = None,        # pixels
+    min_fps: int | None = None,
+    video_codecs: list[str] = [],
+    has_audio: bool | None = None,
+    has_gps: bool | None = None,
+    sort_desc: bool = False,
 ) -> bool:
     # Validate at least one filter
-    if not persons and not location and not from_date and not to_date:
-        print("❌ Specify at least one filter: --persons, --location, or --from/--to")
+    if not persons and not location and not from_date and not to_date \
+            and not concepts and not cameras:
+        print("❌ Specify at least one filter: --persons, --location, --from/--to, --concepts, or --cameras")
         return False
 
     # Resolve persons
@@ -409,9 +421,9 @@ def collect(
         # end of day
         to_ts = int(datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()) + 86399
 
-    # Map type string to item_type int
+    # Map type strings to item_type ints
     type_map = {"photo": 0, "video": 1, "live": 3, "motion": 6}
-    item_type_int = type_map.get(item_type) if item_type else None
+    item_type_ints = [type_map[t] for t in item_types if t in type_map]
 
     # Query
     items = query_items(
@@ -419,16 +431,28 @@ def collect(
         geocoding_ids=geocoding_ids,
         from_ts=from_ts,
         to_ts=to_ts,
-        item_types=[item_type_int] if item_type_int is not None else [],
+        item_types=item_type_ints,
         all_persons=all_persons,
+        concepts=concepts,
+        min_confidence=min_confidence,
+        cameras=cameras,
+        min_duration_s=min_duration,
+        max_duration_s=max_duration,
+        min_width=min_width,
+        min_fps=min_fps,
+        video_codecs=video_codecs,
+        has_audio=has_audio,
+        has_gps=has_gps,
         limit=limit,
+        sort_desc=sort_desc,
     )
 
     # Auto-name output dir
     if not output_dir:
         output_dir = _make_output_dir(resolved_persons, location, from_date, to_date)
 
-    print_preview(items, resolved_persons, location, from_date, to_date, item_type, output_dir, all_persons)
+    type_label = ", ".join(item_types) if item_types else None
+    print_preview(items, resolved_persons, location, from_date, to_date, type_label, output_dir, all_persons)
 
     if not download or not items:
         return True

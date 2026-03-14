@@ -102,17 +102,30 @@ def cmd_collect(args):
     """Handle collect command."""
     config = get_config()
     photos = get_photos_instance(config)
+    has_audio = True if args.has_audio else (False if args.no_audio else None)
+    has_gps   = True if args.has_gps   else (False if args.no_gps   else None)
     collect.collect(
         photos,
         persons=args.persons,
         location=args.location,
         from_date=args.from_date,
         to_date=args.to_date,
-        item_type=args.type,
+        item_types=args.type or [],
         output_dir=args.output,
         download=args.download,
         limit=args.limit,
         all_persons=args.all_persons,
+        concepts=args.concepts or [],
+        min_confidence=args.min_confidence,
+        cameras=args.cameras or [],
+        min_duration=args.min_duration,
+        max_duration=args.max_duration,
+        min_width=args.min_width,
+        min_fps=args.min_fps,
+        video_codecs=args.codecs or [],
+        has_audio=has_audio,
+        has_gps=has_gps,
+        sort_desc=args.sort_desc,
     )
 
 
@@ -192,15 +205,28 @@ Examples:
 
     # Collect command
     collect_parser = subparsers.add_parser('collect', help='Collect photos/videos by persons, location, and date')
-    collect_parser.add_argument('--persons', nargs='+', metavar='NAME', help='Person names (all must appear)')
+    collect_parser.add_argument('--persons', nargs='+', metavar='NAME', help='Person names')
     collect_parser.add_argument('--location', type=str, help='Location name (country or region)')
     collect_parser.add_argument('--from', dest='from_date', metavar='YYYY-MM-DD', help='Start date (inclusive)')
     collect_parser.add_argument('--to', dest='to_date', metavar='YYYY-MM-DD', help='End date (inclusive)')
-    collect_parser.add_argument('--type', choices=['photo', 'video', 'live', 'motion'], help='Media type filter')
+    collect_parser.add_argument('--type', nargs='+', choices=['photo', 'video', 'live', 'motion'], help='Media type(s)')
     collect_parser.add_argument('--output', type=str, help='Output directory (auto-named if omitted)')
     collect_parser.add_argument('--download', action='store_true', help='Download files (preview only without this)')
     collect_parser.add_argument('--limit', type=int, help='Cap number of items')
-    collect_parser.add_argument('--all-persons', action='store_true', help='All persons must co-appear in same photo (default: any)')
+    collect_parser.add_argument('--all-persons', action='store_true', help='All persons must co-appear (default: any)')
+    collect_parser.add_argument('--concepts', nargs='+', metavar='STEM', help='AI concept stems (e.g. food beach)')
+    collect_parser.add_argument('--min-confidence', type=float, default=0.7, metavar='0-1', help='Min concept confidence (default: 0.7)')
+    collect_parser.add_argument('--cameras', nargs='+', metavar='MODEL', help='Camera model names')
+    collect_parser.add_argument('--min-duration', type=int, metavar='SEC', help='Min video duration (seconds)')
+    collect_parser.add_argument('--max-duration', type=int, metavar='SEC', help='Max video duration (seconds)')
+    collect_parser.add_argument('--min-width', type=int, metavar='PX', help='Min video width in pixels (e.g. 3840 for 4K)')
+    collect_parser.add_argument('--min-fps', type=int, metavar='FPS', help='Min frame rate (e.g. 60)')
+    collect_parser.add_argument('--codecs', nargs='+', choices=['hevc', 'h264', 'vp9'], help='Video codec(s)')
+    collect_parser.add_argument('--has-audio', action='store_true', help='Only items with audio')
+    collect_parser.add_argument('--no-audio', action='store_true', help='Only items without audio')
+    collect_parser.add_argument('--has-gps', action='store_true', help='Only items with GPS')
+    collect_parser.add_argument('--no-gps', action='store_true', help='Only items without GPS')
+    collect_parser.add_argument('--sort-desc', action='store_true', help='Sort newest first (default: oldest first)')
 
     # Session command
     session_parser = subparsers.add_parser('session', help='Manage login session')
