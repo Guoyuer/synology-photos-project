@@ -18,10 +18,11 @@ interface DrillLevel {
 interface Props {
   items: MediaItem[]
   onDateFilter: (from: string, to: string) => void
+  onClearDateFilter: () => void
   onScrollTo: (itemIndex: number) => void
 }
 
-export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
+export function TimelineBar({ items, onDateFilter, onClearDateFilter, onScrollTo }: Props) {
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([])
   // Forced top-level granularity when user navigates "back" from auto-detected level
   const [topGran, setTopGran] = useState<Granularity | null>(null)
@@ -57,13 +58,22 @@ export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
 
   const handleBack = useCallback(() => {
     if (drillStack.length > 0) {
-      setDrillStack(prev => prev.slice(0, -1))
+      const newStack = drillStack.slice(0, -1)
+      setDrillStack(newStack)
+      if (newStack.length > 0) {
+        // Expand date filter to parent drill range
+        const parent = newStack[newStack.length - 1]
+        onDateFilter(parent.filterRange.from, parent.filterRange.to)
+      } else {
+        onClearDateFilter()
+      }
     } else {
-      // At top level — zoom out to coarser granularity
+      // At top level — zoom out to coarser granularity and clear date filter
+      onClearDateFilter()
       if (gran === 'month') setTopGran('quarter')
-      else if (gran === 'quarter') { setTopGran(null) } // 'year' is default
+      else if (gran === 'quarter') setTopGran(null) // 'year' is default
     }
-  }, [drillStack, gran])
+  }, [drillStack, gran, onDateFilter, onClearDateFilter])
 
   const canGoBack = drillStack.length > 0 || gran !== 'year'
 
