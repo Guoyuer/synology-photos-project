@@ -217,7 +217,7 @@ def thumbnail(item_id: int, size: str = "sm"):
         "id": item_id,
         "type": "unit",
         "size": size_map.get(size, "sm"),
-        "cache_key": cache_key,
+        "cache_key": f"{item_id}_{cache_key}",
         "SynoToken": photos.session.syno_token,
         "_sid": photos.session.sid,
     }
