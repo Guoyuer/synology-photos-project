@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface Option {
   value: string | number
@@ -17,6 +17,15 @@ interface Props {
 export function MultiSelect({ options, selected, onChange, placeholder = 'Select...', searchable = true }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const filtered = query
     ? options.filter(o => o.label.toLowerCase().includes(query.toLowerCase()))
@@ -29,7 +38,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'Select
   const selectedLabels = selected.map(v => options.find(o => o.value === v)?.label ?? v).join(', ')
 
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
@@ -39,7 +48,7 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'Select
         <span className="ml-2 text-gray-400">▾</span>
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-gray-800 border border-gray-600 rounded shadow-lg max-h-64 overflow-y-auto">
+        <div className="absolute z-[9999] mt-1 w-full bg-gray-800 border border-gray-600 rounded shadow-lg max-h-64 overflow-y-auto">
           {searchable && (
             <input
               autoFocus
