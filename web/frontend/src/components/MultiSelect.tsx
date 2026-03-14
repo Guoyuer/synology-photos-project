@@ -40,16 +40,31 @@ export function MultiSelect({ options, selected, onChange, placeholder = 'Select
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        type="button"
+      <div
         onClick={() => !disabled && setOpen(o => !o)}
-        disabled={disabled}
-        className={`w-full text-left px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm flex justify-between items-center
-          ${disabled ? 'opacity-40 cursor-not-allowed text-gray-500' : 'text-gray-200'}`}
+        className={`w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm flex flex-wrap items-center gap-1 min-h-[38px]
+          ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
       >
-        <span className="truncate">{selected.length ? selectedLabels : <span className="text-gray-500">{placeholder}</span>}</span>
-        <span className="ml-2 text-gray-400">▾</span>
-      </button>
+        {selected.length === 0
+          ? <span className="text-gray-500 flex-1">{placeholder}</span>
+          : selected.map(v => {
+              const label = options.find(o => o.value === v)?.label ?? String(v)
+              return (
+                <span key={v}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-700 text-white rounded text-xs"
+                >
+                  {label}
+                  <button
+                    type="button"
+                    onClick={e => { e.stopPropagation(); toggle(v) }}
+                    className="hover:text-red-300 leading-none"
+                  >×</button>
+                </span>
+              )
+            })
+        }
+        <span className="ml-auto text-gray-400 pl-1">▾</span>
+      </div>
       {open && (
         <div className="absolute z-[9999] mt-1 w-full bg-gray-800 border border-gray-600 rounded shadow-lg max-h-64 overflow-y-auto">
           {searchable && (
