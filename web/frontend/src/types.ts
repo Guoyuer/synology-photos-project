@@ -35,9 +35,24 @@ export interface MediaItem {
   duration: number | null
   vres_x: number | null
   fps: number | null
+  video_codec: string | null
+  video_bitrate: number | null
+  container_type: string | null
+  audio_codec: string | null
+  audio_channel: number | null
+  audio_frequency: number | null
   country: string | null
+  first_level: string | null
   district: string | null
+  folder_path: string | null
   camera: string | null
+  lens: string | null
+  focal_length: string | null
+  aperture: string | null
+  iso: string | null
+  exposure_time: string | null
+  flash: number | null
+  description: string | null
   latitude: number | null
   longitude: number | null
 }

@@ -8,9 +8,10 @@ interface Props {
   items: MediaItem[]
   onClose: () => void
   onNav: (item: MediaItem) => void
+  onInfo: (item: MediaItem) => void
 }
 
-export function Lightbox({ item, items, onClose, onNav }: Props) {
+export function Lightbox({ item, items, onClose, onNav, onInfo }: Props) {
   const idx = items.findIndex(i => i.id === item.id)
   const prev = idx > 0 ? items[idx - 1] : null
   const next = idx < items.length - 1 ? items[idx + 1] : null
@@ -45,8 +46,13 @@ export function Lightbox({ item, items, onClose, onNav }: Props) {
           <span>{fmt(item.filesize)}</span>
           <span className="text-gray-400">{idx + 1} / {items.length}</span>
         </div>
+        <button onClick={() => onInfo(item)}
+          className="ml-4 text-gray-400 hover:text-white text-lg leading-none transition-colors"
+          title="Show metadata">
+          ⓘ
+        </button>
         <button onClick={onClose}
-          className="ml-6 text-gray-400 hover:text-white text-2xl leading-none transition-colors">
+          className="ml-3 text-gray-400 hover:text-white text-2xl leading-none transition-colors">
           ×
         </button>
       </div>

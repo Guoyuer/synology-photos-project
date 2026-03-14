@@ -9,6 +9,12 @@ export function fmtDur(ms: number | null) {
   return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`
 }
 
+export function fmtFps(fps: number | null): string | null {
+  if (fps == null) return null
+  const n = fps >= 1000 ? fps / 1000 : fps
+  return `${n} fps`
+}
+
 export const TYPE_BADGE: Record<string, string> = {
   photo: 'bg-blue-700',
   video: 'bg-red-700',

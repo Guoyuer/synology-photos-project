@@ -265,15 +265,31 @@ def query_items(
             va.duration,
             (va.video_info->>'resolution_x')::int  AS vres_x,
             (va.video_info->>'frame_rate_num')::int AS fps,
+            va.video_info->>'video_codec'              AS video_codec,
+            (va.video_info->>'video_bitrate')::bigint  AS video_bitrate,
+            va.video_info->>'container_type'           AS container_type,
+            va.audio_info->>'audio_codec'              AS audio_codec,
+            (va.audio_info->>'channel')::int           AS audio_channel,
+            (va.audio_info->>'frequency')::int         AS audio_frequency,
             gi.country,
+            gi.first_level,
             gi.second_level AS district,
+            f.name          AS folder_path,
             m.camera,
+            m.lens,
+            m.focal_length,
+            m.aperture,
+            m.iso,
+            m.exposure_time,
+            m.flash,
+            m.description,
             m.latitude,
             m.longitude
         FROM unit u
         {person_filter}
         LEFT JOIN video_additional va ON va.id_unit = u.id
         LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
+        LEFT JOIN folder f           ON f.id = u.id_folder
         LEFT JOIN metadata m         ON m.id_unit = u.id
         WHERE {' AND '.join(conditions)}
         ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}

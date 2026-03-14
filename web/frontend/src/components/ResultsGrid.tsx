@@ -4,6 +4,7 @@ import { thumbnailUrl } from '../api'
 import { fmt, fmtDur, TYPE_BADGE } from '../utils'
 import { ContextMenu } from './ContextMenu'
 import { Lightbox } from './Lightbox'
+import { MetaPanel } from './MetaPanel'
 import type { MediaItem } from '../types'
 
 interface Props {
@@ -22,6 +23,7 @@ const ITEM_W = 172  // approximate grid item width + gap
 export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [preview, setPreview] = useState<MediaItem | null>(null)
+  const [infoItem, setInfoItem] = useState<MediaItem | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const roRef = useRef<ResizeObserver | null>(null)
@@ -212,6 +214,7 @@ export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, o
           onClose={() => setCtxMenu(null)}
           items={[
             { label: '🔍 View full size', onClick: () => setPreview(ctxMenu.item) },
+            { label: 'ⓘ Info', onClick: () => setInfoItem(ctxMenu.item) },
             {
               label: cartIds.has(ctxMenu.item.id) ? '✓ Remove from cart' : '+ Add to cart',
               onClick: () => onToggle(ctxMenu.item),
@@ -226,8 +229,11 @@ export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, o
           items={items}
           onClose={() => setPreview(null)}
           onNav={setPreview}
+          onInfo={setInfoItem}
         />
       )}
+
+      {infoItem && <MetaPanel item={infoItem} onClose={() => setInfoItem(null)} />}
     </div>
   )
 }
