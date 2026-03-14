@@ -5,6 +5,7 @@ import { fmt, fmtDur, TYPE_BADGE } from '../utils'
 import { ContextMenu } from './ContextMenu'
 import { Lightbox } from './Lightbox'
 import { MetaPanel } from './MetaPanel'
+import { TimelineBar } from './TimelineBar'
 import type { MediaItem } from '../types'
 
 interface Props {
@@ -19,11 +20,12 @@ interface Props {
   onClearAll: (ids: number[]) => void
   onClearCart: () => void
   onRemoveFromCart: (id: number) => void
+  onDateFilter: (from: string, to: string) => void
 }
 
 const ITEM_W = 172  // approximate grid item width + gap
 
-export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll, onClearCart, onRemoveFromCart }: Props) {
+export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll, onClearCart, onRemoveFromCart, onDateFilter }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [preview, setPreview] = useState<MediaItem | null>(null)
   const [infoItem, setInfoItem] = useState<MediaItem | null>(null)
@@ -184,7 +186,8 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
         </div>
       )}
 
-      {/* Scrollable container */}
+      {/* Scrollable container + Timeline */}
+      <div className="flex-1 flex min-h-0">
       <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden styled-scrollbar">
         {view === 'grid' ? (
           <div ref={containerRef} className="p-4">
@@ -275,6 +278,15 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
             </tbody>
           </table>
         )}
+      </div>
+      <TimelineBar
+        items={items}
+        onDateFilter={onDateFilter}
+        onScrollTo={itemIndex => {
+          const rowIndex = Math.floor(itemIndex / Math.max(1, cols))
+          gridVirtualizer.scrollToIndex(rowIndex, { align: 'start' })
+        }}
+      />
       </div>
 
       {ctxMenu && (

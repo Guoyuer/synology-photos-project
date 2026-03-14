@@ -127,7 +127,9 @@ export default function App() {
               const next = { ...filters, sortDesc: !filters.sortDesc }
               setFilters(next)
               handleSearch(toRequest(next))
-            }} />
+            }}
+            onDateFilter={(from, to) => setFilters({ ...filters, fromDate: from, toDate: to })}
+          />
         )}
       </div>
     </div>
