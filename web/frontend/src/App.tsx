@@ -54,6 +54,7 @@ export default function App() {
   const [cart, setCart] = useState<MediaItem[]>([])
   const { filters, setFilters } = useUrlFilters()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     Promise.all([fetchPersons(), fetchLocations(), fetchConcepts(), fetchCameras()])
@@ -67,15 +68,19 @@ export default function App() {
   }, [])
 
   const handleSearch = async (req: CollectRequest) => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setLoading(true)
     setError(null)
     try {
-      const res = await runCollect(req)
+      const res = await runCollect(req, controller.signal)
       setResult(res)
     } catch (e) {
-      setError(String(e))
+      if ((e as Error).name !== 'AbortError') setError(String(e))
     } finally {
-      setLoading(false)
+      if (abortRef.current === controller) setLoading(false)
     }
   }
 

@@ -24,11 +24,12 @@ export function fetchCameras(): Promise<Camera[]> {
   return apiFetch(`${BASE}/cameras`)
 }
 
-export async function runCollect(req: CollectRequest): Promise<CollectResult> {
+export async function runCollect(req: CollectRequest, signal?: AbortSignal): Promise<CollectResult> {
   const res = await fetch(`${BASE}/collect`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
+    signal,
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
@@ -53,11 +54,30 @@ export async function downloadItems(itemIds: number[]): Promise<void> {
     body: JSON.stringify({ item_ids: itemIds }),
   })
   if (!res.ok) throw new Error(await res.text())
+
+  const filename = `photos_${itemIds.length}.zip`
+
+  // Stream directly to disk via the File System Access API — no in-memory blob
+  if ('showSaveFilePicker' in window && res.body) {
+    try {
+      const handle = await (window as any).showSaveFilePicker({
+        suggestedName: filename,
+        types: [{ description: 'ZIP archive', accept: { 'application/zip': ['.zip'] } }],
+      })
+      await res.body.pipeTo(await handle.createWritable())
+      return
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') throw e  // user cancelled picker
+      // API unavailable — fall through to blob
+    }
+  }
+
+  // Fallback: buffer as blob (works everywhere)
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `photos_${itemIds.length}.zip`
+  a.download = filename
   a.click()
   URL.revokeObjectURL(url)
 }
