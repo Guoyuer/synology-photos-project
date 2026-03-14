@@ -14,8 +14,6 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cart, setCart] = useState<MediaItem[]>([])
-  const [lastReq, setLastReq] = useState<CollectRequest | null>(null)
-  const [hasMore, setHasMore] = useState(false)
 
   useEffect(() => {
     Promise.all([fetchPersons(), fetchLocations(), fetchConcepts(), fetchCameras()])
@@ -31,28 +29,9 @@ export default function App() {
   const handleSearch = async (req: CollectRequest) => {
     setLoading(true)
     setError(null)
-    setLastReq(req)
     try {
       const res = await runCollect(req)
       setResult(res)
-      setHasMore(req.limit != null && res.items.length === req.limit)
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleLoadMore = async () => {
-    if (!lastReq || !result) return
-    setLoading(true)
-    setError(null)
-    const req = { ...lastReq, offset: result.items.length }
-    try {
-      const res = await runCollect(req)
-      const merged = { ...result, items: [...result.items, ...res.items] }
-      setResult(merged)
-      setHasMore(lastReq.limit != null && res.items.length === lastReq.limit)
     } catch (e) {
       setError(String(e))
     } finally {
@@ -100,8 +79,7 @@ export default function App() {
         {!loading && result && (
           <ResultsGrid items={result.items} totalMb={result.total_mb}
             cartIds={cartIds} onToggle={toggleCart}
-            onSelectAll={addAllToCart} onClearAll={removeFromCart}
-            hasMore={hasMore} onLoadMore={handleLoadMore} loading={loading} />
+            onSelectAll={addAllToCart} onClearAll={removeFromCart} />
         )}
         {!loading && !result && !error && (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-3">

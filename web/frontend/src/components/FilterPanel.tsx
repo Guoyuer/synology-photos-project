@@ -32,7 +32,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
   const [selectedCameras, setSelectedCameras] = useState<string[]>([])
   const [minDuration, setMinDuration] = useState('')
   const [minWidth, setMinWidth] = useState('')
-  const [limit, setLimit] = useState('200')
+  const [limit, setLimit] = useState('')
 
   const countries = useMemo(() =>
     [...new Set(locations.map(l => l.country))].sort(), [locations])
@@ -65,14 +65,13 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
       min_duration: minDuration ? parseInt(minDuration) : null,
       min_width: minWidth ? parseInt(minWidth) : null,
       limit: limit ? parseInt(limit) : null,
-      offset: 0,
     })
   }
 
   const reset = () => {
     setPersonIds([]); setAllPersons(false); setCountry(''); setFirstLevel(''); setDistrict('')
     setFromDate(''); setToDate(''); setItemTypes([]); setSelectedConcepts([])
-    setMinConfidence(0.7); setSelectedCameras([]); setMinDuration(''); setMinWidth(''); setLimit('200')
+    setMinConfidence(0.7); setSelectedCameras([]); setMinDuration(''); setMinWidth(''); setLimit('')
   }
 
   return (

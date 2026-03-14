@@ -11,9 +11,6 @@ interface Props {
   onToggle: (item: MediaItem) => void
   onSelectAll: (items: MediaItem[]) => void
   onClearAll: (ids: number[]) => void
-  hasMore: boolean
-  onLoadMore: () => void
-  loading: boolean
 }
 
 const TYPE_BADGE: Record<string, string> = {
@@ -34,7 +31,7 @@ function fmtDur(ms: number | null) {
   return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`
 }
 
-export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, onClearAll, hasMore, onLoadMore, loading }: Props) {
+export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, onClearAll }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [preview, setPreview] = useState<MediaItem | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null)
@@ -158,18 +155,6 @@ export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, on
           </table>
         )}
       </div>
-
-      {hasMore && (
-        <div className="shrink-0 flex justify-center py-4 border-t border-gray-800">
-          <button
-            onClick={onLoadMore}
-            disabled={loading}
-            className="px-6 py-2 bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 text-gray-300 disabled:text-gray-600 rounded text-sm transition-colors"
-          >
-            {loading ? 'Loading…' : 'Load more'}
-          </button>
-        </div>
-      )}
 
       {ctxMenu && (
         <ContextMenu
