@@ -109,6 +109,7 @@ def query_items(
     min_duration_s: int | None = None,   # minimum video duration in seconds
     min_width: int | None = None,        # minimum video width (e.g. 3840 for 4K)
     limit: int | None = None,
+    offset: int = 0,
 ) -> list[dict]:
     """
     Core query function — single source of truth for all item filtering.
@@ -238,10 +239,13 @@ def query_items(
         WHERE {' AND '.join(conditions)}
         ORDER BY u.takentime
         {'LIMIT %s' if limit else ''}
+        {'OFFSET %s' if offset else ''}
     """
 
     if limit:
         params.append(limit)
+    if offset:
+        params.append(offset)
     cur.execute(sql, params)
     cols = [d[0] for d in cur.description]
     seen = set()

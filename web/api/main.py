@@ -152,6 +152,7 @@ class CollectRequest(BaseModel):
     min_duration: Optional[int] = None   # seconds
     min_width: Optional[int] = None
     limit: Optional[int] = None
+    offset: int = 0
 
 
 @app.post("/api/collect")
@@ -180,6 +181,7 @@ def collect(req: CollectRequest):
         min_duration_s=req.min_duration,
         min_width=req.min_width,
         limit=req.limit,
+        offset=req.offset,
     )
 
     for item in items:
