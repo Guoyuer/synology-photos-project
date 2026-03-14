@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import type { Camera, CollectRequest, Concept, Location, Person } from '../types'
 import { MultiSelect } from './MultiSelect'
+import { DEFAULT_FILTERS, type FilterState } from '../hooks/useUrlFilters'
 
 interface Props {
   persons: Person[]
   locations: Location[]
   concepts: Concept[]
   cameras: Camera[]
+  filters: FilterState
+  onFiltersChange: (f: FilterState) => void
   onSearch: (req: CollectRequest) => void
   loading: boolean
 }
@@ -18,60 +21,43 @@ const ITEM_TYPES = [
   { value: 6, label: 'Motion Photo' },
 ]
 
-export function FilterPanel({ persons, locations, concepts, cameras, onSearch, loading }: Props) {
-  const [personIds, setPersonIds] = useState<number[]>([])
-  const [allPersons, setAllPersons] = useState(false)
-  const [country, setCountry] = useState('')
-  const [firstLevel, setFirstLevel] = useState('')
-  const [district, setDistrict] = useState('')
-  const [fromDate, setFromDate] = useState('')
-  const [toDate, setToDate] = useState('')
-  const [itemTypes, setItemTypes] = useState<number[]>([])
-  const [selectedConcepts, setSelectedConcepts] = useState<string[]>([])
-  const [minConfidence, setMinConfidence] = useState(0.7)
-  const [selectedCameras, setSelectedCameras] = useState<string[]>([])
-  const [minDuration, setMinDuration] = useState('')
-  const [minWidth, setMinWidth] = useState('')
-  const [limit, setLimit] = useState('')
+export function FilterPanel({ persons, locations, concepts, cameras, filters, onFiltersChange, onSearch, loading }: Props) {
+  const set = <K extends keyof FilterState>(key: K, value: FilterState[K]) =>
+    onFiltersChange({ ...filters, [key]: value })
 
   const countries = useMemo(() =>
     [...new Set(locations.map(l => l.country))].sort(), [locations])
 
   const firstLevels = useMemo(() =>
     [...new Set(
-      locations.filter(l => l.country === country && l.first_level).map(l => l.first_level)
-    )].sort(), [locations, country])
+      locations.filter(l => l.country === filters.country && l.first_level).map(l => l.first_level)
+    )].sort(), [locations, filters.country])
 
   const districts = useMemo(() =>
     [...new Set(
       locations
-        .filter(l => l.country === country && (!firstLevel || l.first_level === firstLevel) && l.second_level)
+        .filter(l => l.country === filters.country && (!filters.firstLevel || l.first_level === filters.firstLevel) && l.second_level)
         .map(l => l.second_level)
-    )].filter(Boolean).sort(), [locations, country, firstLevel])
+    )].filter(Boolean).sort(), [locations, filters.country, filters.firstLevel])
 
   const submit = () => {
     onSearch({
-      person_ids: personIds,
-      all_persons: allPersons,
-      country: country || null,
-      first_level: firstLevel || null,
-      district: district || null,
-      from_date: fromDate || null,
-      to_date: toDate || null,
-      item_types: itemTypes,
-      concepts: selectedConcepts,
-      min_confidence: minConfidence,
-      cameras: selectedCameras,
-      min_duration: minDuration ? parseInt(minDuration) : null,
-      min_width: minWidth ? parseInt(minWidth) : null,
-      limit: limit ? parseInt(limit) : null,
+      person_ids: filters.personIds,
+      all_persons: filters.allPersons,
+      country: filters.country || null,
+      first_level: filters.firstLevel || null,
+      district: filters.district || null,
+      from_date: filters.fromDate || null,
+      to_date: filters.toDate || null,
+      item_types: filters.itemTypes,
+      concepts: filters.selectedConcepts,
+      min_confidence: filters.minConfidence,
+      cameras: filters.selectedCameras,
+      min_duration: filters.minDuration ? parseInt(filters.minDuration) : null,
+      min_width: filters.minWidth ? parseInt(filters.minWidth) : null,
+      limit: filters.limit ? parseInt(filters.limit) : null,
+      sort_desc: filters.sortDesc,
     })
-  }
-
-  const reset = () => {
-    setPersonIds([]); setAllPersons(false); setCountry(''); setFirstLevel(''); setDistrict('')
-    setFromDate(''); setToDate(''); setItemTypes([]); setSelectedConcepts([])
-    setMinConfidence(0.7); setSelectedCameras([]); setMinDuration(''); setMinWidth(''); setLimit('')
   }
 
   return (
@@ -83,13 +69,13 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Persons</label>
         <MultiSelect
           options={persons.map(p => ({ value: p.id, label: p.name, sub: `${p.item_count}` }))}
-          selected={personIds}
-          onChange={v => setPersonIds(v as number[])}
+          selected={filters.personIds}
+          onChange={v => set('personIds', v as number[])}
           placeholder="Any person..."
         />
-        {personIds.length > 1 && (
+        {filters.personIds.length > 1 && (
           <label className="flex items-center gap-2 mt-2 text-xs text-gray-400 cursor-pointer">
-            <input type="checkbox" checked={allPersons} onChange={e => setAllPersons(e.target.checked)} className="accent-blue-500" />
+            <input type="checkbox" checked={filters.allPersons} onChange={e => set('allPersons', e.target.checked)} className="accent-blue-500" />
             All must co-appear (intersection)
           </label>
         )}
@@ -99,19 +85,19 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
       <section>
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Country</label>
         <select
-          value={country}
-          onChange={e => { setCountry(e.target.value); setFirstLevel(''); setDistrict('') }}
+          value={filters.country}
+          onChange={e => onFiltersChange({ ...filters, country: e.target.value, firstLevel: '', district: '' })}
           className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200"
         >
           <option value="">Any location</option>
           {countries.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        {country && firstLevels.length > 0 && (
+        {filters.country && firstLevels.length > 0 && (
           <>
             <label className="block text-xs font-semibold text-gray-400 uppercase mt-2 mb-1">City / Region</label>
             <select
-              value={firstLevel}
-              onChange={e => { setFirstLevel(e.target.value); setDistrict('') }}
+              value={filters.firstLevel}
+              onChange={e => onFiltersChange({ ...filters, firstLevel: e.target.value, district: '' })}
               className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200"
             >
               <option value="">All</option>
@@ -119,12 +105,12 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
             </select>
           </>
         )}
-        {country && districts.length > 0 && (
+        {filters.country && districts.length > 0 && (
           <>
             <label className="block text-xs font-semibold text-gray-400 uppercase mt-2 mb-1">District</label>
             <select
-              value={district}
-              onChange={e => setDistrict(e.target.value)}
+              value={filters.district}
+              onChange={e => set('district', e.target.value)}
               className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200"
             >
               <option value="">All</option>
@@ -138,9 +124,9 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
       <section>
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Date Range</label>
         <div className="flex gap-2">
-          <input type="date" value={fromDate} onChange={e => setFromDate(e.target.value)}
+          <input type="date" value={filters.fromDate} onChange={e => set('fromDate', e.target.value)}
             className="flex-1 px-2 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200" />
-          <input type="date" value={toDate} onChange={e => setToDate(e.target.value)}
+          <input type="date" value={filters.toDate} onChange={e => set('toDate', e.target.value)}
             className="flex-1 px-2 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200" />
         </div>
       </section>
@@ -152,8 +138,12 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
           {ITEM_TYPES.map(t => (
             <label key={t.value} className="flex items-center gap-1 text-sm text-gray-300 cursor-pointer">
               <input type="checkbox"
-                checked={itemTypes.includes(t.value)}
-                onChange={() => setItemTypes(v => v.includes(t.value) ? v.filter(x => x !== t.value) : [...v, t.value])}
+                checked={filters.itemTypes.includes(t.value)}
+                onChange={() => set('itemTypes',
+                  filters.itemTypes.includes(t.value)
+                    ? filters.itemTypes.filter(x => x !== t.value)
+                    : [...filters.itemTypes, t.value]
+                )}
                 className="accent-blue-500"
               />
               {t.label}
@@ -167,17 +157,17 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">AI Concepts</label>
         <MultiSelect
           options={concepts.map(c => ({ value: c.stem, label: c.stem, sub: `${c.usage_count}` }))}
-          selected={selectedConcepts}
-          onChange={v => setSelectedConcepts(v as string[])}
+          selected={filters.selectedConcepts}
+          onChange={v => set('selectedConcepts', v as string[])}
           placeholder="food, beach, cityscape..."
         />
-        {selectedConcepts.length > 0 && (
+        {filters.selectedConcepts.length > 0 && (
           <div className="mt-2 flex items-center gap-2">
             <label className="text-xs text-gray-400">Min confidence:</label>
-            <input type="range" min="0.5" max="1" step="0.05" value={minConfidence}
-              onChange={e => setMinConfidence(parseFloat(e.target.value))}
+            <input type="range" min="0.5" max="1" step="0.05" value={filters.minConfidence}
+              onChange={e => set('minConfidence', parseFloat(e.target.value))}
               className="flex-1" />
-            <span className="text-xs text-gray-300 w-8">{minConfidence.toFixed(2)}</span>
+            <span className="text-xs text-gray-300 w-8">{filters.minConfidence.toFixed(2)}</span>
           </div>
         )}
       </section>
@@ -187,8 +177,8 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Camera</label>
         <MultiSelect
           options={cameras.map(c => ({ value: c.camera, label: c.camera, sub: `${c.item_count}` }))}
-          selected={selectedCameras}
-          onChange={v => setSelectedCameras(v as string[])}
+          selected={filters.selectedCameras}
+          onChange={v => set('selectedCameras', v as string[])}
           placeholder="Any camera..."
         />
       </section>
@@ -199,12 +189,12 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-400 w-24">Min duration</label>
-            <input type="number" value={minDuration} onChange={e => setMinDuration(e.target.value)}
+            <input type="number" value={filters.minDuration} onChange={e => set('minDuration', e.target.value)}
               placeholder="sec" className="flex-1 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200" />
           </div>
           <div className="flex items-center gap-2">
             <label className="text-xs text-gray-400 w-24">Min width</label>
-            <select value={minWidth} onChange={e => setMinWidth(e.target.value)}
+            <select value={filters.minWidth} onChange={e => set('minWidth', e.target.value)}
               className="flex-1 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200">
               <option value="">Any</option>
               <option value="1920">1080p (1920)</option>
@@ -218,7 +208,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
       {/* Limit */}
       <section>
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Limit results</label>
-        <input type="number" value={limit} onChange={e => setLimit(e.target.value)}
+        <input type="number" value={filters.limit} onChange={e => set('limit', e.target.value)}
           placeholder="No limit"
           className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200" />
       </section>
@@ -228,7 +218,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
           className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white font-semibold rounded text-sm transition-colors">
           {loading ? 'Searching...' : 'Search'}
         </button>
-        <button onClick={reset}
+        <button onClick={() => onFiltersChange(DEFAULT_FILTERS)}
           className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-sm transition-colors">
           Reset
         </button>

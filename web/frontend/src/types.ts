@@ -63,4 +63,5 @@ export interface CollectRequest {
   min_duration: number | null
   min_width: number | null
   limit: number | null
+  sort_desc: boolean
 }

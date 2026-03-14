@@ -3,7 +3,28 @@ import { fetchCameras, fetchConcepts, fetchLocations, fetchPersons, runCollect }
 import { CartBar } from './components/CartBar'
 import { FilterPanel } from './components/FilterPanel'
 import { ResultsGrid } from './components/ResultsGrid'
+import { useUrlFilters, type FilterState } from './hooks/useUrlFilters'
 import type { Camera, CollectRequest, CollectResult, Concept, Location, MediaItem, Person } from './types'
+
+function toRequest(f: FilterState): CollectRequest {
+  return {
+    person_ids: f.personIds,
+    all_persons: f.allPersons,
+    country: f.country || null,
+    first_level: f.firstLevel || null,
+    district: f.district || null,
+    from_date: f.fromDate || null,
+    to_date: f.toDate || null,
+    item_types: f.itemTypes,
+    concepts: f.selectedConcepts,
+    min_confidence: f.minConfidence,
+    cameras: f.selectedCameras,
+    min_duration: f.minDuration ? parseInt(f.minDuration) : null,
+    min_width: f.minWidth ? parseInt(f.minWidth) : null,
+    limit: f.limit ? parseInt(f.limit) : null,
+    sort_desc: f.sortDesc,
+  }
+}
 
 export default function App() {
   const [persons, setPersons] = useState<Person[]>([])
@@ -14,6 +35,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cart, setCart] = useState<MediaItem[]>([])
+  const { filters, setFilters } = useUrlFilters()
 
   useEffect(() => {
     Promise.all([fetchPersons(), fetchLocations(), fetchConcepts(), fetchCameras()])
@@ -66,6 +88,8 @@ export default function App() {
         locations={locations}
         concepts={concepts}
         cameras={cameras}
+        filters={filters}
+        onFiltersChange={setFilters}
         onSearch={handleSearch}
         loading={loading}
       />
@@ -79,7 +103,13 @@ export default function App() {
         {!loading && result && (
           <ResultsGrid items={result.items} totalMb={result.total_mb}
             cartIds={cartIds} onToggle={toggleCart}
-            onSelectAll={addAllToCart} onClearAll={removeFromCart} />
+            onSelectAll={addAllToCart} onClearAll={removeFromCart}
+            sortDesc={filters.sortDesc}
+            onSortToggle={() => {
+              const next = { ...filters, sortDesc: !filters.sortDesc }
+              setFilters(next)
+              handleSearch(toRequest(next))
+            }} />
         )}
         {!loading && !result && !error && (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-3">

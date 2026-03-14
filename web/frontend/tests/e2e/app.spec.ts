@@ -433,3 +433,88 @@ test('cart expand — clicking CartBar shows list of items, × removes an item',
 test.skip('SQL mode — not implemented yet', async () => {
   // This feature is not yet implemented in the UI.
 })
+
+// ---------------------------------------------------------------------------
+// 10. URL sync — filters encode to URL and restore from URL
+// ---------------------------------------------------------------------------
+
+test('URL sync — selecting country updates URL immediately', async ({ page }) => {
+  await loadApp(page)
+
+  const countrySelect = page.locator('select').first()
+  await countrySelect.selectOption('Singapore')
+
+  const url = new URL(page.url())
+  expect(url.searchParams.get('country')).toBe('Singapore')
+})
+
+test('URL sync — selecting person updates URL immediately', async ({ page }) => {
+  await loadApp(page)
+
+  const personsSection = page.locator('section').filter({ hasText: 'Persons' })
+  await personsSection.locator('button').first().click()
+  await page.getByLabel('Yuer Guo').check()
+  await page.keyboard.press('Escape')
+
+  const url = new URL(page.url())
+  expect(url.searchParams.getAll('persons')).toContain('88')
+})
+
+test('URL sync — setting date range updates URL', async ({ page }) => {
+  await loadApp(page)
+
+  await page.locator('input[type="date"]').first().fill('2024-01-01')
+  await page.locator('input[type="date"]').nth(1).fill('2024-12-31')
+
+  const url = new URL(page.url())
+  expect(url.searchParams.get('from')).toBe('2024-01-01')
+  expect(url.searchParams.get('to')).toBe('2024-12-31')
+})
+
+test('URL sync — restore person filter from URL on load', async ({ page }) => {
+  await setupMocks(page)
+  await page.goto('/?persons=88')
+  await page.waitForSelector('text=Photo Collect')
+
+  // Persons dropdown button should show selected person name
+  const personsSection = page.locator('section').filter({ hasText: 'Persons' })
+  await expect(personsSection.locator('button').first()).toContainText('Yuer Guo')
+})
+
+test('URL sync — restore country and date filters from URL on load', async ({ page }) => {
+  await setupMocks(page)
+  await page.goto('/?country=Singapore&from=2024-01-01&to=2024-12-31')
+  await page.waitForSelector('text=Photo Collect')
+
+  await expect(page.locator('select').first()).toHaveValue('Singapore')
+  await expect(page.locator('input[type="date"]').first()).toHaveValue('2024-01-01')
+  await expect(page.locator('input[type="date"]').nth(1)).toHaveValue('2024-12-31')
+})
+
+test('URL sync — reset clears all URL params', async ({ page }) => {
+  await setupMocks(page)
+  await page.goto('/?country=Singapore&from=2024-01-01&persons=88')
+  await page.waitForSelector('text=Photo Collect')
+
+  await page.getByRole('button', { name: 'Reset' }).click()
+
+  const url = new URL(page.url())
+  expect(url.search).toBe('')
+})
+
+test('URL sync — sort order button reflected in URL and re-runs search', async ({ page }) => {
+  await loadApp(page)
+  await doSearch(page)
+
+  // Click sort toggle — should update URL
+  await page.getByRole('button', { name: /Oldest|Newest/ }).click()
+  await page.waitForSelector('text=2 items')
+
+  const url = new URL(page.url())
+  expect(url.searchParams.get('sort')).toBe('desc')
+
+  // Toggle back
+  await page.getByRole('button', { name: /Oldest|Newest/ }).click()
+  await page.waitForSelector('text=2 items')
+  expect(new URL(page.url()).searchParams.get('sort')).toBeNull()
+})

@@ -109,6 +109,7 @@ def query_items(
     min_duration_s: int | None = None,   # minimum video duration in seconds
     min_width: int | None = None,        # minimum video width (e.g. 3840 for 4K)
     limit: int | None = None,
+    sort_desc: bool = False,
 ) -> list[dict]:
     """
     Core query function — single source of truth for all item filtering.
@@ -236,7 +237,7 @@ def query_items(
         LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
         LEFT JOIN metadata m         ON m.id_unit = u.id
         WHERE {' AND '.join(conditions)}
-        ORDER BY u.takentime
+        ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}
         {'LIMIT %s' if limit else ''}
     """
 

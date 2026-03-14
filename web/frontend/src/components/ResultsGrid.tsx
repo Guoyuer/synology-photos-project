@@ -10,6 +10,8 @@ interface Props {
   items: MediaItem[]
   totalMb: number
   cartIds: Set<number>
+  sortDesc: boolean
+  onSortToggle: () => void
   onToggle: (item: MediaItem) => void
   onSelectAll: (items: MediaItem[]) => void
   onClearAll: (ids: number[]) => void
@@ -17,7 +19,7 @@ interface Props {
 
 const ITEM_W = 172  // approximate grid item width + gap
 
-export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, onClearAll }: Props) {
+export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [preview, setPreview] = useState<MediaItem | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null)
@@ -86,6 +88,13 @@ export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, on
           {selectedInView.length > 0 && (
             <span className="text-xs text-yellow-400">{selectedInView.length} selected · {fmt(selectedBytes)}</span>
           )}
+          <button
+            onClick={onSortToggle}
+            title={sortDesc ? 'Newest first — click for oldest first' : 'Oldest first — click for newest first'}
+            className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300 hover:bg-gray-600"
+          >
+            {sortDesc ? '↓ Newest' : '↑ Oldest'}
+          </button>
           <div className="flex gap-1">
             <button onClick={() => setView('grid')}
               className={`px-2 py-1 rounded text-xs ${view === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}>
