@@ -129,9 +129,6 @@ export default function App() {
               handleSearch(toRequest(next))
             }}
             onDateFilter={(from, to) => setFilters({ ...filters, fromDate: from, toDate: to })}
-            fromDate={filters.fromDate}
-            toDate={filters.toDate}
-            onClearDateFilter={() => setFilters({ ...filters, fromDate: '', toDate: '' })}
           />
         )}
       </div>

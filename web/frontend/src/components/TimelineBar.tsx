@@ -19,12 +19,9 @@ interface Props {
   items: MediaItem[]
   onDateFilter: (from: string, to: string) => void
   onScrollTo: (itemIndex: number) => void
-  fromDate?: string
-  toDate?: string
-  onClearDateFilter: () => void
 }
 
-export function TimelineBar({ items, onDateFilter, onScrollTo, fromDate, toDate, onClearDateFilter }: Props) {
+export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([])
 
   const currentDrill = drillStack.length > 0 ? drillStack[drillStack.length - 1] : null
@@ -62,26 +59,13 @@ export function TimelineBar({ items, onDateFilter, onScrollTo, fromDate, toDate,
     setDrillStack(prev => prev.slice(0, -1))
   }, [])
 
-  const dateFilterActive = !!(fromDate || toDate)
-
-  if (!bins.length && !dateFilterActive && !currentDrill) return null
+  if (!bins.length && !currentDrill) return null
 
   const binH = bins.length > 0 ? Math.max(4, Math.min(32, Math.floor(600 / bins.length))) : 0
 
   return (
     <div className="w-12 shrink-0 flex flex-col overflow-y-auto bg-gray-900 border-l border-gray-800 select-none"
       style={{ scrollbarWidth: 'none' }}>
-
-      {/* Clear date filter + reset drill-down */}
-      {(dateFilterActive || currentDrill) && (
-        <button
-          onClick={() => { onClearDateFilter(); setDrillStack([]) }}
-          title="Clear date filter and reset drill-down"
-          className="shrink-0 flex items-center justify-center h-6 text-[9px] text-red-400 hover:text-red-300 hover:bg-gray-800 border-b border-gray-800 transition-colors"
-        >
-          Clear
-        </button>
-      )}
 
       {/* Back/up button when drilled down */}
       {currentDrill && (

@@ -21,14 +21,11 @@ interface Props {
   onClearCart: () => void
   onRemoveFromCart: (id: number) => void
   onDateFilter: (from: string, to: string) => void
-  fromDate?: string
-  toDate?: string
-  onClearDateFilter: () => void
 }
 
 const ITEM_W = 172  // approximate grid item width + gap
 
-export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll, onClearCart, onRemoveFromCart, onDateFilter, fromDate, toDate, onClearDateFilter }: Props) {
+export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll, onClearCart, onRemoveFromCart, onDateFilter }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [preview, setPreview] = useState<MediaItem | null>(null)
   const [infoItem, setInfoItem] = useState<MediaItem | null>(null)
@@ -289,9 +286,6 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
           const rowIndex = Math.floor(itemIndex / Math.max(1, cols))
           gridVirtualizer.scrollToIndex(rowIndex, { align: 'start' })
         }}
-        fromDate={fromDate}
-        toDate={toDate}
-        onClearDateFilter={onClearDateFilter}
       />
       </div>
 
