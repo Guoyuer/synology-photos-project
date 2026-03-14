@@ -62,6 +62,11 @@ export interface CollectRequest {
   cameras: string[]
   min_duration: number | null
   min_width: number | null
+  max_duration: number | null
+  min_fps: number | null
+  video_codecs: string[]
+  has_audio: boolean | null
+  has_gps: boolean | null
   limit: number | null
   sort_desc: boolean
 }

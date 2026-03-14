@@ -21,6 +21,11 @@ function toRequest(f: FilterState): CollectRequest {
     cameras: f.selectedCameras,
     min_duration: f.minDuration ? parseInt(f.minDuration) : null,
     min_width: f.minWidth ? parseInt(f.minWidth) : null,
+    max_duration: f.maxDuration ? parseInt(f.maxDuration) : null,
+    min_fps: f.minFps ? parseInt(f.minFps) : null,
+    video_codecs: f.videoCodecs,
+    has_audio: f.hasAudio === 'yes' ? true : f.hasAudio === 'no' ? false : null,
+    has_gps: f.hasGps === 'yes' ? true : f.hasGps === 'no' ? false : null,
     limit: f.limit ? parseInt(f.limit) : null,
     sort_desc: f.sortDesc,
   }

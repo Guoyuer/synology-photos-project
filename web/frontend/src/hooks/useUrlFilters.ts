@@ -14,6 +14,11 @@ export interface FilterState {
   selectedCameras: string[]
   minDuration: string
   minWidth: string
+  maxDuration: string
+  minFps: string
+  videoCodecs: string[]
+  hasAudio: string
+  hasGps: string
   limit: string
   sortDesc: boolean
 }
@@ -32,6 +37,11 @@ export const DEFAULT_FILTERS: FilterState = {
   selectedCameras: [],
   minDuration: '',
   minWidth: '',
+  maxDuration: '',
+  minFps: '',
+  videoCodecs: [],
+  hasAudio: '',
+  hasGps: '',
   limit: '',
   sortDesc: false,
 }
@@ -52,6 +62,11 @@ function fromParams(p: URLSearchParams): FilterState {
     selectedCameras: p.getAll('cameras'),
     minDuration: p.get('dur') ?? '',
     minWidth: p.get('width') ?? '',
+    maxDuration: p.get('maxdur') ?? '',
+    minFps: p.get('fps') ?? '',
+    videoCodecs: p.getAll('codec'),
+    hasAudio: p.get('audio') ?? '',
+    hasGps: p.get('gps') ?? '',
     limit: p.get('limit') ?? '',
     sortDesc: p.get('sort') === 'desc',
   }
@@ -72,6 +87,11 @@ export function toSearch(f: FilterState): string {
   f.selectedCameras.forEach(c => p.append('cameras', c))
   if (f.minDuration) p.set('dur', f.minDuration)
   if (f.minWidth) p.set('width', f.minWidth)
+  if (f.maxDuration) p.set('maxdur', f.maxDuration)
+  if (f.minFps) p.set('fps', f.minFps)
+  f.videoCodecs.forEach(c => p.append('codec', c))
+  if (f.hasAudio) p.set('audio', f.hasAudio)
+  if (f.hasGps) p.set('gps', f.hasGps)
   if (f.limit) p.set('limit', f.limit)
   if (f.sortDesc) p.set('sort', 'desc')
   const qs = p.toString()

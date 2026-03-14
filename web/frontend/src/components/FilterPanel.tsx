@@ -55,6 +55,11 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
       cameras: filters.selectedCameras,
       min_duration: filters.minDuration ? parseInt(filters.minDuration) : null,
       min_width: filters.minWidth ? parseInt(filters.minWidth) : null,
+      max_duration: filters.maxDuration ? parseInt(filters.maxDuration) : null,
+      min_fps: filters.minFps ? parseInt(filters.minFps) : null,
+      video_codecs: filters.videoCodecs,
+      has_audio: filters.hasAudio === 'yes' ? true : filters.hasAudio === 'no' ? false : null,
+      has_gps: filters.hasGps === 'yes' ? true : filters.hasGps === 'no' ? false : null,
       limit: filters.limit ? parseInt(filters.limit) : null,
       sort_desc: filters.sortDesc,
     })
@@ -118,6 +123,17 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
             </select>
           </>
         )}
+      </section>
+
+      {/* Has GPS */}
+      <section>
+        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">GPS</label>
+        <select value={filters.hasGps} onChange={e => set('hasGps', e.target.value)}
+          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200">
+          <option value="">Any</option>
+          <option value="yes">With GPS</option>
+          <option value="no">Without GPS</option>
+        </select>
       </section>
 
       {/* Date range */}
@@ -200,6 +216,48 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
               <option value="1920">1080p (1920)</option>
               <option value="2560">1440p (2560)</option>
               <option value="3840">4K (3840)</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-400 w-24">Max duration</label>
+            <input type="number" value={filters.maxDuration} onChange={e => set('maxDuration', e.target.value)}
+              placeholder="sec" className="flex-1 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200" />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-400 w-24">Min FPS</label>
+            <select value={filters.minFps} onChange={e => set('minFps', e.target.value)}
+              className="flex-1 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200">
+              <option value="">Any</option>
+              <option value="30">30fps+</option>
+              <option value="60">60fps+</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-gray-400">Codec</label>
+            <div className="flex gap-3">
+              {(['hevc', 'h264', 'vp9'] as const).map(codec => (
+                <label key={codec} className="flex items-center gap-1 text-xs text-gray-300 cursor-pointer">
+                  <input type="checkbox"
+                    checked={filters.videoCodecs.includes(codec)}
+                    onChange={() => set('videoCodecs',
+                      filters.videoCodecs.includes(codec)
+                        ? filters.videoCodecs.filter(c => c !== codec)
+                        : [...filters.videoCodecs, codec]
+                    )}
+                    className="accent-blue-500"
+                  />
+                  {codec.toUpperCase().replace('264', '-264')}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-400 w-24">Audio</label>
+            <select value={filters.hasAudio} onChange={e => set('hasAudio', e.target.value)}
+              className="flex-1 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200">
+              <option value="">Any</option>
+              <option value="yes">With audio</option>
+              <option value="no">Without audio</option>
             </select>
           </div>
         </div>
