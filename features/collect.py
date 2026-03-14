@@ -264,20 +264,7 @@ def query_items(
                 conditions.append(f"(SELECT COUNT(*) FROM face f WHERE f.id_unit = u.id) {sql_op} %s")
                 params.append(int(m.group(2)))
 
-    # CTE finds matching IDs cheaply (no expensive joins), then we enrich only
-    # those rows. This lets LIMIT apply before the heavy LEFT JOINs, avoiding
-    # full-table SELECT DISTINCT which blocks early termination.
-    limit_clause = 'LIMIT %s' if limit else ''
-    sql = f"""
-        WITH ids AS (
-            SELECT u.id, u.takentime
-            FROM unit u
-            {person_filter}
-            WHERE {' AND '.join(conditions)}
-            ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}
-            {limit_clause}
-        )
-        SELECT
+    select_cols = """
             u.id,
             u.filename,
             u.takentime,
@@ -312,15 +299,41 @@ def query_items(
             m.orientation,
             m.description,
             m.latitude,
-            m.longitude
-        FROM ids
-        JOIN unit u ON u.id = ids.id
+            m.longitude"""
+    enrich_joins = """
         LEFT JOIN video_additional va ON va.id_unit = u.id
         LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
         LEFT JOIN folder f           ON f.id = u.id_folder
-        LEFT JOIN metadata m         ON m.id_unit = u.id
-        ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}
-    """
+        LEFT JOIN metadata m         ON m.id_unit = u.id"""
+    order = f"ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}"
+
+    if limit:
+        # CTE finds matching IDs cheaply, then enriches only limited rows.
+        sql = f"""
+            WITH ids AS (
+                SELECT u.id, u.takentime
+                FROM unit u
+                {person_filter}
+                WHERE {' AND '.join(conditions)}
+                {order}
+                LIMIT %s
+            )
+            SELECT {select_cols}
+            FROM ids
+            JOIN unit u ON u.id = ids.id
+            {enrich_joins}
+            {order}
+        """
+    else:
+        # No LIMIT — direct query avoids CTE materialization overhead.
+        sql = f"""
+            SELECT {select_cols}
+            FROM unit u
+            {person_filter}
+            {enrich_joins}
+            WHERE {' AND '.join(conditions)}
+            {order}
+        """
 
     if limit:
         params.append(limit)

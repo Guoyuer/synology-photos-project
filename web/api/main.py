@@ -7,12 +7,15 @@ from typing import Optional
 
 import json
 import mimetypes
+
+import orjson
 import psycopg2
 import psycopg2.extras
 import requests
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
@@ -23,6 +26,7 @@ from features.collect import query_items, ITEM_TYPE_NAMES
 
 app = FastAPI(title="Synology Photos API")
 
+app.add_middleware(GZipMiddleware, minimum_size=1000, compresslevel=1)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -198,11 +202,12 @@ def collect(req: CollectRequest):
         item["taken_iso"] = datetime.fromtimestamp(item["takentime"]).isoformat() if item["takentime"] else None
 
     total_bytes = sum(r.get("filesize") or 0 for r in items)
-    return {
+    payload = {
         "items": items,
         "count": len(items),
         "total_mb": round(total_bytes / 1024 / 1024, 1),
     }
+    return Response(content=orjson.dumps(payload), media_type="application/json")
 
 
 # ---------------------------------------------------------------------------
