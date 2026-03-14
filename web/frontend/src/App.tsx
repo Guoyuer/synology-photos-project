@@ -87,7 +87,8 @@ export default function App() {
             <span className="text-lg">Set filters and search to find your vlog material</span>
           </div>
         )}
-        <CartBar cart={cart} onClear={() => setCart([])} />
+        <CartBar cart={cart} onClear={() => setCart([])}
+          onRemove={id => setCart(prev => prev.filter(i => i.id !== id))} />
       </div>
     </div>
   )
