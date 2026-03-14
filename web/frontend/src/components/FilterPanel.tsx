@@ -299,13 +299,6 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
         </div>
       </section>}
 
-      {/* Limit */}
-      <section>
-        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Limit results</label>
-        <input type="number" value={filters.limit} onChange={e => set('limit', e.target.value)}
-          placeholder="No limit"
-          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200" />
-      </section>
 
       <div className="flex justify-center mt-2">
         <button onClick={() => onFiltersChange(DEFAULT_FILTERS)}

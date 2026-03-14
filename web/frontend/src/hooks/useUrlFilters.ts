@@ -19,7 +19,6 @@ export interface FilterState {
   videoCodecs: string[]
   hasAudio: string
   hasGps: string
-  limit: string
   sortDesc: boolean
 }
 
@@ -42,7 +41,6 @@ export const DEFAULT_FILTERS: FilterState = {
   videoCodecs: [],
   hasAudio: '',
   hasGps: '',
-  limit: '',
   sortDesc: true,
 }
 
@@ -67,7 +65,6 @@ function fromParams(p: URLSearchParams): FilterState {
     videoCodecs: p.getAll('codec'),
     hasAudio: p.get('audio') ?? '',
     hasGps: p.get('gps') ?? '',
-    limit: p.get('limit') ?? '',
     sortDesc: p.get('sort') !== 'asc',
   }
 }
@@ -92,7 +89,6 @@ export function toSearch(f: FilterState): string {
   f.videoCodecs.forEach(c => p.append('codec', c))
   if (f.hasAudio) p.set('audio', f.hasAudio)
   if (f.hasGps) p.set('gps', f.hasGps)
-  if (f.limit) p.set('limit', f.limit)
   if (!f.sortDesc) p.set('sort', 'asc')
   const qs = p.toString()
   return qs ? `?${qs}` : ''
