@@ -183,8 +183,8 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
         />
       </section>
 
-      {/* Video filters */}
-      <section>
+      {/* Video filters — only relevant when Video type is selected */}
+      {filters.itemTypes.includes(1) && <section>
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Video Filters</label>
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
@@ -203,7 +203,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
             </select>
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* Limit */}
       <section>
