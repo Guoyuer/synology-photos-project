@@ -59,8 +59,19 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
         )}
       </section>
 
-      {/* Location */}
+      {/* Has GPS */}
       <section>
+        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">GPS</label>
+        <select value={filters.hasGps} onChange={e => set('hasGps', e.target.value)}
+          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200">
+          <option value="">Any</option>
+          <option value="yes">With GPS</option>
+          <option value="no">Without GPS</option>
+        </select>
+      </section>
+
+      {/* Location — only shown when GPS is not excluded */}
+      {filters.hasGps !== 'no' && <section>
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Country</label>
         <select
           value={filters.country}
@@ -96,18 +107,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
             </select>
           </>
         )}
-      </section>
-
-      {/* Has GPS */}
-      <section>
-        <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">GPS</label>
-        <select value={filters.hasGps} onChange={e => set('hasGps', e.target.value)}
-          className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200">
-          <option value="">Any</option>
-          <option value="yes">With GPS</option>
-          <option value="no">Without GPS</option>
-        </select>
-      </section>
+      </section>}
 
       {/* Date range */}
       <section>

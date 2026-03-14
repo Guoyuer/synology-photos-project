@@ -363,6 +363,38 @@ def stream_media(item_id: int, as_video: bool = False):
 
 
 # ---------------------------------------------------------------------------
+# Item metadata (persons + concepts) — used by MetaPanel
+# ---------------------------------------------------------------------------
+
+@app.get("/api/meta/{item_id}")
+def item_meta(item_id: int):
+    conn = db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT p.name
+        FROM many_unit_has_many_person mp
+        JOIN person p ON p.id = mp.id_person
+        WHERE mp.id_unit = %s AND p.name != ''
+        ORDER BY p.name
+    """, (item_id,))
+    persons = [r["name"] for r in cur.fetchall()]
+
+    cur.execute("""
+        SELECT c.stem, mc.confidence
+        FROM many_unit_has_many_concept mc
+        JOIN concept c ON c.id = mc.id_concept
+        WHERE mc.id_unit = %s AND c.hidden = false
+        ORDER BY mc.confidence DESC
+        LIMIT 20
+    """, (item_id,))
+    concepts = [{"stem": r["stem"], "confidence": round(r["confidence"], 2)} for r in cur.fetchall()]
+
+    conn.close()
+    return {"persons": persons, "concepts": concepts}
+
+
+# ---------------------------------------------------------------------------
 # Thumbnail proxy
 # ---------------------------------------------------------------------------
 

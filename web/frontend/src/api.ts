@@ -42,6 +42,10 @@ export function thumbnailUrl(id: number, size: 'sm' | 'md' | 'lg' = 'sm') {
   return `${BASE}/thumbnail/${id}?size=${size}`
 }
 
+export function fetchItemMeta(id: number): Promise<{ persons: string[]; concepts: { stem: string; confidence: number }[] }> {
+  return apiFetch(`${BASE}/meta/${id}`)
+}
+
 export async function downloadItems(itemIds: number[]): Promise<void> {
   const res = await fetch(`${BASE}/download`, {
     method: 'POST',

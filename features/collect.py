@@ -264,6 +264,7 @@ def query_items(
             (u.resolution->>'height')::int  AS height,
             va.duration,
             (va.video_info->>'resolution_x')::int  AS vres_x,
+            (va.video_info->>'resolution_y')::int  AS vres_y,
             (va.video_info->>'frame_rate_num')::int AS fps,
             va.video_info->>'video_codec'              AS video_codec,
             (va.video_info->>'video_bitrate')::bigint  AS video_bitrate,
@@ -271,6 +272,7 @@ def query_items(
             va.audio_info->>'audio_codec'              AS audio_codec,
             (va.audio_info->>'channel')::int           AS audio_channel,
             (va.audio_info->>'frequency')::int         AS audio_frequency,
+            (va.audio_info->>'audio_bitrate')::bigint  AS audio_bitrate,
             gi.country,
             gi.first_level,
             gi.second_level AS district,
@@ -282,6 +284,7 @@ def query_items(
             m.iso,
             m.exposure_time,
             m.flash,
+            m.orientation,
             m.description,
             m.latitude,
             m.longitude

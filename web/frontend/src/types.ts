@@ -34,6 +34,7 @@ export interface MediaItem {
   height: number | null
   duration: number | null
   vres_x: number | null
+  vres_y: number | null
   fps: number | null
   video_codec: string | null
   video_bitrate: number | null
@@ -41,6 +42,7 @@ export interface MediaItem {
   audio_codec: string | null
   audio_channel: number | null
   audio_frequency: number | null
+  audio_bitrate: number | null
   country: string | null
   first_level: string | null
   district: string | null
@@ -52,6 +54,7 @@ export interface MediaItem {
   iso: string | null
   exposure_time: string | null
   flash: number | null
+  orientation: number | null
   description: string | null
   latitude: number | null
   longitude: number | null
