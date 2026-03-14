@@ -43,7 +43,7 @@ export const DEFAULT_FILTERS: FilterState = {
   hasAudio: '',
   hasGps: '',
   limit: '',
-  sortDesc: false,
+  sortDesc: true,
 }
 
 function fromParams(p: URLSearchParams): FilterState {
@@ -68,7 +68,7 @@ function fromParams(p: URLSearchParams): FilterState {
     hasAudio: p.get('audio') ?? '',
     hasGps: p.get('gps') ?? '',
     limit: p.get('limit') ?? '',
-    sortDesc: p.get('sort') === 'desc',
+    sortDesc: p.get('sort') !== 'asc',
   }
 }
 
@@ -93,7 +93,7 @@ export function toSearch(f: FilterState): string {
   if (f.hasAudio) p.set('audio', f.hasAudio)
   if (f.hasGps) p.set('gps', f.hasGps)
   if (f.limit) p.set('limit', f.limit)
-  if (f.sortDesc) p.set('sort', 'desc')
+  if (!f.sortDesc) p.set('sort', 'asc')
   const qs = p.toString()
   return qs ? `?${qs}` : ''
 }
