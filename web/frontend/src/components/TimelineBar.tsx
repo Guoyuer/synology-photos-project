@@ -38,9 +38,9 @@ export function TimelineBar({ items, onDateFilter, onScrollTo, fromDate, toDate,
 
   const handleClick = useCallback((bin: Bin) => {
     if (gran === 'year') {
-      // Drill into months of that year
+      // Drill into quarters of that year
       setDrillStack(prev => [...prev, {
-        gran: 'month',
+        gran: 'quarter',
         filterRange: { from: bin.fromDate, to: bin.toDate },
         label: bin.label,
       }])
@@ -72,11 +72,11 @@ export function TimelineBar({ items, onDateFilter, onScrollTo, fromDate, toDate,
     <div className="w-12 shrink-0 flex flex-col overflow-y-auto bg-gray-900 border-l border-gray-800 select-none"
       style={{ scrollbarWidth: 'none' }}>
 
-      {/* Clear date filter button */}
-      {dateFilterActive && (
+      {/* Clear date filter + reset drill-down */}
+      {(dateFilterActive || currentDrill) && (
         <button
-          onClick={onClearDateFilter}
-          title="Clear date filter"
+          onClick={() => { onClearDateFilter(); setDrillStack([]) }}
+          title="Clear date filter and reset drill-down"
           className="shrink-0 flex items-center justify-center h-6 text-[9px] text-red-400 hover:text-red-300 hover:bg-gray-800 border-b border-gray-800 transition-colors"
         >
           Clear
