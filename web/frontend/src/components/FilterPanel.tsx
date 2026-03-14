@@ -299,7 +299,6 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
         </div>
       </section>}
 
-
       <div className="flex justify-center mt-2">
         <button onClick={() => onFiltersChange(DEFAULT_FILTERS)}
           className="text-xs text-gray-500 hover:text-gray-300 underline transition-colors">

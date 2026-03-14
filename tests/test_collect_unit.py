@@ -30,7 +30,7 @@ def _stub_heavy_imports():
     ):
         # Remove any previously cached version of the module
         for key in list(sys.modules.keys()):
-            if key in ("features.collect",):
+            if key in ("features.collect", "db_config"):
                 del sys.modules[key]
         yield psycopg2_stub
 
@@ -364,3 +364,49 @@ class TestResolvePersons:
         ])
         result = collect_mod.resolve_persons(["Alice", "Bob"])
         assert result == {1: "Alice", 2: "Bob"}
+
+
+# ===========================================================================
+# parse_date_range
+# ===========================================================================
+
+class TestParseDateRange:
+    def test_both_none(self, collect_mod):
+        from_ts, to_ts = collect_mod.parse_date_range(None, None)
+        assert from_ts is None
+        assert to_ts is None
+
+    def test_from_date_only(self, collect_mod):
+        from_ts, to_ts = collect_mod.parse_date_range("2023-01-01", None)
+        from datetime import datetime, timezone
+        assert from_ts == int(datetime(2023, 1, 1, tzinfo=timezone.utc).timestamp())
+        assert to_ts is None
+
+    def test_to_date_only(self, collect_mod):
+        from_ts, to_ts = collect_mod.parse_date_range(None, "2023-01-31")
+        from datetime import datetime, timezone
+        assert from_ts is None
+        assert to_ts == int(datetime(2023, 1, 31, tzinfo=timezone.utc).timestamp()) + 86399
+
+    def test_both_dates(self, collect_mod):
+        from_ts, to_ts = collect_mod.parse_date_range("2023-06-01", "2023-06-30")
+        from datetime import datetime, timezone
+        assert from_ts == int(datetime(2023, 6, 1, tzinfo=timezone.utc).timestamp())
+        assert to_ts == int(datetime(2023, 6, 30, tzinfo=timezone.utc).timestamp()) + 86399
+
+    def test_invalid_date_raises(self, collect_mod):
+        with pytest.raises(ValueError):
+            collect_mod.parse_date_range("not-a-date", None)
+
+
+# ===========================================================================
+# ITEM_TYPE_IDS
+# ===========================================================================
+
+class TestItemTypeIds:
+    def test_inverse_of_names(self, collect_mod):
+        assert collect_mod.ITEM_TYPE_IDS == {"photo": 0, "video": 1, "live": 3, "motion": 6}
+
+    def test_roundtrip(self, collect_mod):
+        for type_int, name in collect_mod.ITEM_TYPE_NAMES.items():
+            assert collect_mod.ITEM_TYPE_IDS[name] == type_int

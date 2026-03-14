@@ -1,24 +1,34 @@
 """Collect photos/videos matching persons, location, and date range."""
 
-import os
 import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg2
 
+from db_config import get_db_params
 from features.download import download_item
 
 ITEM_TYPE_NAMES = {0: "photo", 1: "video", 3: "live", 6: "motion"}
+ITEM_TYPE_IDS = {v: k for k, v in ITEM_TYPE_NAMES.items()}
+
+
+def parse_date_range(from_date: str | None, to_date: str | None) -> tuple[int | None, int | None]:
+    """Convert YYYY-MM-DD date strings to Unix timestamps (UTC).
+
+    to_date is set to end-of-day (23:59:59).
+    """
+    from_ts = None
+    to_ts = None
+    if from_date:
+        from_ts = int(datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
+    if to_date:
+        to_ts = int(datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()) + 86399
+    return from_ts, to_ts
 
 
 def _db_connect():
-    return psycopg2.connect(
-        host=os.getenv("NAS_DB_HOST", "192.168.1.169"),
-        port=int(os.getenv("NAS_DB_PORT", "5432")),
-        dbname=os.getenv("NAS_DB_NAME", "synofoto"),
-        user=os.getenv("NAS_DB_USER", "postgres"),
-    )
+    return psycopg2.connect(**get_db_params())
 
 
 def resolve_persons(names: list[str]) -> dict[int, str]:
@@ -427,17 +437,10 @@ def collect(
             print(f"❌ {e}")
             return False
 
-    # Parse dates to unix timestamps
-    from_ts = to_ts = None
-    if from_date:
-        from_ts = int(datetime.strptime(from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
-    if to_date:
-        # end of day
-        to_ts = int(datetime.strptime(to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()) + 86399
+    from_ts, to_ts = parse_date_range(from_date, to_date)
 
     # Map type strings to item_type ints
-    type_map = {"photo": 0, "video": 1, "live": 3, "motion": 6}
-    item_type_ints = [type_map[t] for t in item_types if t in type_map]
+    item_type_ints = [ITEM_TYPE_IDS[t] for t in item_types if t in ITEM_TYPE_IDS]
 
     # Query
     items = query_items(

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Utility to manage Synology Photos API session."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from session_manager import (
     clear_session, load_session_from_file, SESSION_FILE,
     is_session_expired, SESSION_EXPIRY_HOURS
@@ -11,7 +11,10 @@ from session_manager import (
 def format_time_ago(iso_string):
     """Convert ISO datetime string to 'X time ago' format."""
     dt = datetime.fromisoformat(iso_string)
-    now = datetime.now()
+    # Handle legacy naive timestamps by treating them as UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    now = datetime.now(timezone.utc)
     diff = now - dt
 
     if diff.total_seconds() < 60:
@@ -50,8 +53,11 @@ def show_status():
         print(f"🕐 Last used:   {last_used.strftime('%Y-%m-%d %H:%M:%S')} ({format_time_ago(session['last_used'])})")
 
         # Expiry time
+        # Handle legacy naive timestamps by treating them as UTC
+        if last_used.tzinfo is None:
+            last_used = last_used.replace(tzinfo=timezone.utc)
         expiry = last_used + timedelta(hours=SESSION_EXPIRY_HOURS)
-        time_remaining = (expiry - datetime.now()).total_seconds()
+        time_remaining = (expiry - datetime.now(timezone.utc)).total_seconds()
 
         if time_remaining > 0:
             hours_left = int(time_remaining / 3600)

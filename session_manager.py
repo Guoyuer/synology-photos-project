@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from synology_api.photos import Photos
 from synology_api import base_api
 
@@ -13,7 +13,7 @@ SESSION_EXPIRY_HOURS = 24  # Sessions expire after 24 hours of no use
 
 def save_session(photos_obj, is_new=True):
     """Save session credentials to file."""
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     # Load existing session to preserve creation time
     existing_data = None
@@ -61,8 +61,11 @@ def is_session_expired(session_data):
         return True
 
     last_used = datetime.fromisoformat(session_data['last_used'])
+    # Handle legacy naive timestamps by treating them as UTC
+    if last_used.tzinfo is None:
+        last_used = last_used.replace(tzinfo=timezone.utc)
     expiry_time = last_used + timedelta(hours=SESSION_EXPIRY_HOURS)
-    return datetime.now() > expiry_time
+    return datetime.now(timezone.utc) > expiry_time
 
 
 def get_photos_api(nas_ip, nas_port, nas_username, nas_password,

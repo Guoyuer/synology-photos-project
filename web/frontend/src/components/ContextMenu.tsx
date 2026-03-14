@@ -26,7 +26,7 @@ export function ContextMenu({ x, y, items, onClose }: Props) {
       document.removeEventListener('mousedown', handler)
       document.removeEventListener('keydown', escHandler)
     }
-  }, [])
+  }, [onClose])
 
   // Keep menu inside viewport
   const style: React.CSSProperties = {

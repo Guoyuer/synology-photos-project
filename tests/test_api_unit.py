@@ -77,7 +77,7 @@ def app_client():
     ):
         # Force fresh import
         for mod_name in list(sys.modules.keys()):
-            if "web.api.main" in mod_name or mod_name == "web.api.main":
+            if "web.api.main" in mod_name or mod_name == "web.api.main" or mod_name == "db_config":
                 del sys.modules[mod_name]
 
         import web.api.main as main_mod

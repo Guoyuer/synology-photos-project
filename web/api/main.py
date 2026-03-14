@@ -4,7 +4,7 @@ import os
 import sys
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional
 
 import json
@@ -25,7 +25,8 @@ from pydantic import BaseModel
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
-from features.collect import query_items, ITEM_TYPE_NAMES
+from db_config import get_db_params
+from features.collect import query_items, ITEM_TYPE_NAMES, parse_date_range
 
 app = FastAPI(title="Synology Photos API")
 
@@ -40,10 +41,7 @@ app.add_middleware(
 
 _db_pool = psycopg2.pool.ThreadedConnectionPool(
     minconn=2, maxconn=10,
-    host=os.getenv("NAS_DB_HOST", "192.168.1.169"),
-    port=int(os.getenv("NAS_DB_PORT", "5432")),
-    dbname=os.getenv("NAS_DB_NAME", "synofoto"),
-    user=os.getenv("NAS_DB_USER", "postgres"),
+    **get_db_params(),
     cursor_factory=psycopg2.extras.RealDictCursor,
 )
 
@@ -178,14 +176,7 @@ class CollectRequest(BaseModel):
 
 @app.post("/api/collect")
 def collect(req: CollectRequest):
-    from_ts = (
-        int(datetime.strptime(req.from_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp())
-        if req.from_date else None
-    )
-    to_ts = (
-        int(datetime.strptime(req.to_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()) + 86399
-        if req.to_date else None
-    )
+    from_ts, to_ts = parse_date_range(req.from_date, req.to_date)
 
     items = query_items(
         person_ids=req.person_ids,

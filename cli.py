@@ -27,8 +27,9 @@ def get_config():
     }
 
 
-def get_photos_instance(config):
+def get_photos_instance():
     """Get Photos API instance with session caching."""
+    config = get_config()
     try:
         photos, cached = get_photos_api(
             nas_ip=config['nas_ip'],
@@ -50,22 +51,19 @@ def get_photos_instance(config):
 # Command handlers
 def cmd_user(args):
     """Handle user command."""
-    config = get_config()
-    photos = get_photos_instance(config)
+    photos = get_photos_instance()
     user.get_user_info(photos)
 
 
 def cmd_albums(args):
     """Handle albums command."""
-    config = get_config()
-    photos = get_photos_instance(config)
+    photos = get_photos_instance()
     albums.list_albums(photos, limit=args.limit)
 
 
 def cmd_folders(args):
     """Handle folders command."""
-    config = get_config()
-    photos = get_photos_instance(config)
+    photos = get_photos_instance()
 
     if args.id:
         folders.get_folder(photos, args.id)
@@ -75,15 +73,13 @@ def cmd_folders(args):
 
 def cmd_items(args):
     """Handle items command."""
-    config = get_config()
-    photos = get_photos_instance(config)
+    photos = get_photos_instance()
     items.list_items_in_folder(photos, args.folder, limit=args.limit)
 
 
 def cmd_persons(args):
     """Handle persons command."""
-    config = get_config()
-    photos = get_photos_instance(config)
+    photos = get_photos_instance()
 
     # If person_id is provided, show photos for that person
     if args.person_id:
@@ -100,8 +96,7 @@ def cmd_persons(args):
 
 def cmd_collect(args):
     """Handle collect command."""
-    config = get_config()
-    photos = get_photos_instance(config)
+    photos = get_photos_instance()
     has_audio = True if args.has_audio else (False if args.no_audio else None)
     has_gps   = True if args.has_gps   else (False if args.no_gps   else None)
     collect.collect(
@@ -140,7 +135,7 @@ def cmd_session(args):
 def cmd_all(args):
     """Handle all command - show everything."""
     config = get_config()
-    photos = get_photos_instance(config)
+    photos = get_photos_instance()
 
     print(f"\nConnected to {config['nas_ip']}:{config['nas_port']}")
 
