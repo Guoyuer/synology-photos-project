@@ -75,7 +75,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
   }
 
   return (
-    <div className="bg-gray-900 border-r border-gray-700 w-72 min-h-screen p-4 flex flex-col gap-4 overflow-y-auto">
+    <div className="bg-gray-900 border-r border-gray-700 w-96 p-4 flex flex-col gap-4 overflow-y-auto">
       <h1 className="text-lg font-bold text-white">📸 Photo Collect</h1>
 
       {/* Persons */}
