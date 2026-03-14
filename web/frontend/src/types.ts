@@ -52,6 +52,7 @@ export interface CollectRequest {
   person_ids: number[]
   all_persons: boolean
   country: string | null
+  first_level: string | null
   district: string | null
   from_date: string | null
   to_date: string | null

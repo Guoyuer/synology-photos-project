@@ -139,6 +139,7 @@ class CollectRequest(BaseModel):
     person_ids: list[int] = []
     all_persons: bool = False
     country: Optional[str] = None
+    first_level: Optional[str] = None
     district: Optional[str] = None
     from_date: Optional[str] = None   # YYYY-MM-DD
     to_date: Optional[str] = None
@@ -166,6 +167,7 @@ def collect(req: CollectRequest):
         person_ids=req.person_ids,
         all_persons=req.all_persons,
         country=req.country,
+        first_level=req.first_level,
         district=req.district,
         from_ts=from_ts,
         to_ts=to_ts,

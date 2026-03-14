@@ -22,6 +22,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
   const [personIds, setPersonIds] = useState<number[]>([])
   const [allPersons, setAllPersons] = useState(false)
   const [country, setCountry] = useState('')
+  const [firstLevel, setFirstLevel] = useState('')
   const [district, setDistrict] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -36,18 +37,24 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
   const countries = useMemo(() =>
     [...new Set(locations.map(l => l.country))].sort(), [locations])
 
+  const firstLevels = useMemo(() =>
+    [...new Set(
+      locations.filter(l => l.country === country && l.first_level).map(l => l.first_level)
+    )].sort(), [locations, country])
+
   const districts = useMemo(() =>
-    locations
-      .filter(l => l.country === country && l.second_level)
-      .map(l => l.second_level)
-      .filter(Boolean)
-      .sort(), [locations, country])
+    [...new Set(
+      locations
+        .filter(l => l.country === country && (!firstLevel || l.first_level === firstLevel) && l.second_level)
+        .map(l => l.second_level)
+    )].filter(Boolean).sort(), [locations, country, firstLevel])
 
   const submit = () => {
     onSearch({
       person_ids: personIds,
       all_persons: allPersons,
       country: country || null,
+      first_level: firstLevel || null,
       district: district || null,
       from_date: fromDate || null,
       to_date: toDate || null,
@@ -62,7 +69,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
   }
 
   const reset = () => {
-    setPersonIds([]); setAllPersons(false); setCountry(''); setDistrict('')
+    setPersonIds([]); setAllPersons(false); setCountry(''); setFirstLevel(''); setDistrict('')
     setFromDate(''); setToDate(''); setItemTypes([]); setSelectedConcepts([])
     setMinConfidence(0.7); setSelectedCameras([]); setMinDuration(''); setMinWidth(''); setLimit('')
   }
@@ -93,12 +100,25 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
         <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Country</label>
         <select
           value={country}
-          onChange={e => { setCountry(e.target.value); setDistrict('') }}
+          onChange={e => { setCountry(e.target.value); setFirstLevel(''); setDistrict('') }}
           className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200"
         >
           <option value="">Any location</option>
           {countries.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+        {country && firstLevels.length > 0 && (
+          <>
+            <label className="block text-xs font-semibold text-gray-400 uppercase mt-2 mb-1">City / Region</label>
+            <select
+              value={firstLevel}
+              onChange={e => { setFirstLevel(e.target.value); setDistrict('') }}
+              className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200"
+            >
+              <option value="">All</option>
+              {firstLevels.map(f => <option key={f} value={f}>{f}</option>)}
+            </select>
+          </>
+        )}
         {country && districts.length > 0 && (
           <>
             <label className="block text-xs font-semibold text-gray-400 uppercase mt-2 mb-1">District</label>
@@ -107,7 +127,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, onSearch, l
               onChange={e => setDistrict(e.target.value)}
               className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200"
             >
-              <option value="">All districts</option>
+              <option value="">All</option>
               {districts.map(d => <option key={d} value={d}>{d}</option>)}
             </select>
           </>

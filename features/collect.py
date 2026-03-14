@@ -101,6 +101,7 @@ def query_items(
     item_types: list[int] = [],
     all_persons: bool = False,
     country: str | None = None,          # filter by country name
+    first_level: str | None = None,      # filter by state/city (first_level)
     district: str | None = None,         # filter by district/second_level name
     concepts: list[str] = [],            # AI concept stems
     min_confidence: float = 0.7,
@@ -150,10 +151,13 @@ def query_items(
         conditions.append("u.id_geocoding = ANY(%s)")
         params.append(geocoding_ids)
 
-    # --- Location: country / district by name ---
+    # --- Location: country / first_level / district by name ---
     if country:
         loc_cond = "gi2.country = %s"
         loc_params = [country]
+        if first_level:
+            loc_cond += " AND gi2.first_level = %s"
+            loc_params.append(first_level)
         if district:
             loc_cond += " AND gi2.second_level = %s"
             loc_params.append(district)
