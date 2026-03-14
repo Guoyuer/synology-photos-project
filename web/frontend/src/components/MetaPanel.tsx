@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchItemMeta } from '../api'
-import type { MediaItem } from '../types'
+import type { MediaItem, ItemMeta } from '../types'
 import { fmt, fmtDur, fmtFps } from '../utils'
 
 interface Props {
@@ -35,21 +35,21 @@ const ORIENTATION_LABELS: Record<number, string> = {
 }
 
 export function MetaPanel({ item, onClose }: Props) {
-  const [meta, setMeta] = useState<{ persons: string[]; concepts: { stem: string; confidence: number }[] } | null>(null)
+  const [meta, setMeta] = useState<ItemMeta | null>(null)
 
   useEffect(() => {
     setMeta(null)
     fetchItemMeta(item.id).then(setMeta).catch(() => {})
   }, [item.id])
 
-  const fps = fmtFps(item.fps)
-  const audioChannel = item.audio_channel != null
-    ? ['—', 'Mono', 'Stereo'][item.audio_channel] ?? `${item.audio_channel}ch`
+  const fps = meta ? fmtFps(meta.fps) : null
+  const audioChannel = meta?.audio_channel != null
+    ? ['—', 'Mono', 'Stereo'][meta.audio_channel] ?? `${meta.audio_channel}ch`
     : null
 
-  const videoRes = item.vres_x && item.vres_y ? `${item.vres_x}×${item.vres_y}` : item.vres_x ? `${item.vres_x}p` : null
-  const orientation = item.orientation != null && item.orientation !== 1
-    ? ORIENTATION_LABELS[item.orientation] ?? `${item.orientation}`
+  const videoRes = meta?.vres_x && meta?.vres_y ? `${meta.vres_x}×${meta.vres_y}` : meta?.vres_x ? `${meta.vres_x}p` : null
+  const orientation = meta?.orientation != null && meta.orientation !== 1
+    ? ORIENTATION_LABELS[meta.orientation] ?? `${meta.orientation}`
     : null
 
   return (
@@ -70,45 +70,45 @@ export function MetaPanel({ item, onClose }: Props) {
           <Row label="ID"          value={item.id} />
           <Row label="Date"        value={item.taken_iso?.slice(0, 19).replace('T', ' ')} />
           <Row label="Size"        value={fmt(item.filesize)} />
-          <Row label="Folder"      value={item.folder_path} />
-          <Row label="Description" value={item.description} />
+          <Row label="Folder"      value={meta?.folder_path} />
+          <Row label="Description" value={meta?.description} />
         </Section>
 
         <Section title="Photo">
           <Row label="Dimensions"   value={item.width && item.height ? `${item.width} × ${item.height}` : null} />
           <Row label="Orientation"  value={orientation} />
-          <Row label="Camera"       value={item.camera} />
-          <Row label="Lens"         value={item.lens} />
-          <Row label="Focal length" value={item.focal_length} />
-          <Row label="Aperture"     value={item.aperture} />
-          <Row label="ISO"          value={item.iso} />
-          <Row label="Exposure"     value={item.exposure_time} />
-          <Row label="Flash"        value={item.flash != null ? (item.flash ? 'On' : 'Off') : null} />
+          <Row label="Camera"       value={meta?.camera ?? item.camera} />
+          <Row label="Lens"         value={meta?.lens} />
+          <Row label="Focal length" value={meta?.focal_length} />
+          <Row label="Aperture"     value={meta?.aperture} />
+          <Row label="ISO"          value={meta?.iso} />
+          <Row label="Exposure"     value={meta?.exposure_time} />
+          <Row label="Flash"        value={meta?.flash != null ? (meta.flash ? 'On' : 'Off') : null} />
         </Section>
 
         <Section title="Video">
           <Row label="Duration"      value={item.duration ? fmtDur(item.duration) : null} />
           <Row label="Resolution"    value={videoRes} />
           <Row label="FPS"           value={fps} />
-          <Row label="Video codec"   value={item.video_codec} />
-          <Row label="Container"     value={item.container_type} />
-          <Row label="Video bitrate" value={item.video_bitrate ? `${(item.video_bitrate / 1_000_000).toFixed(1)} Mbps` : null} />
-          <Row label="Audio codec"   value={item.audio_codec} />
+          <Row label="Video codec"   value={meta?.video_codec} />
+          <Row label="Container"     value={meta?.container_type} />
+          <Row label="Video bitrate" value={meta?.video_bitrate ? `${(meta.video_bitrate / 1_000_000).toFixed(1)} Mbps` : null} />
+          <Row label="Audio codec"   value={meta?.audio_codec} />
           <Row label="Audio"         value={audioChannel} />
-          <Row label="Audio bitrate" value={item.audio_bitrate ? `${Math.round(item.audio_bitrate / 1000)} kbps` : null} />
-          <Row label="Sample rate"   value={item.audio_frequency ? `${item.audio_frequency / 1000} kHz` : null} />
+          <Row label="Audio bitrate" value={meta?.audio_bitrate ? `${Math.round(meta.audio_bitrate / 1000)} kbps` : null} />
+          <Row label="Sample rate"   value={meta?.audio_frequency ? `${meta.audio_frequency / 1000} kHz` : null} />
         </Section>
 
         <Section title="Location">
           <Row label="Country"   value={item.country} />
           <Row label="Region"    value={item.first_level} />
           <Row label="District"  value={item.district} />
-          <Row label="Latitude"  value={item.latitude != null ? item.latitude.toFixed(6) : null} />
-          <Row label="Longitude" value={item.longitude != null ? item.longitude.toFixed(6) : null} />
-          {item.latitude != null && item.longitude != null && (
+          <Row label="Latitude"  value={meta?.latitude != null ? meta.latitude.toFixed(6) : null} />
+          <Row label="Longitude" value={meta?.longitude != null ? meta.longitude.toFixed(6) : null} />
+          {meta?.latitude != null && meta?.longitude != null && (
             <div className="pt-1.5">
               <a
-                href={`https://maps.google.com/?q=${item.latitude},${item.longitude}`}
+                href={`https://maps.google.com/?q=${meta.latitude},${meta.longitude}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-xs text-blue-400 hover:text-blue-300"

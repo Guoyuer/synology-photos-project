@@ -398,6 +398,31 @@ def item_meta(item_id: int):
     conn = db()
     cur = conn.cursor()
 
+    # Full item details (EXIF, video, folder — everything the info panel needs)
+    cur.execute("""
+        SELECT f.name AS folder_path,
+               m.camera, m.lens, m.focal_length, m.aperture, m.iso,
+               m.exposure_time, m.flash, m.orientation, m.description,
+               m.latitude, m.longitude,
+               va.duration,
+               (va.video_info->>'resolution_x')::int  AS vres_x,
+               (va.video_info->>'resolution_y')::int  AS vres_y,
+               (va.video_info->>'frame_rate_num')::int AS fps,
+               va.video_info->>'video_codec'              AS video_codec,
+               (va.video_info->>'video_bitrate')::bigint  AS video_bitrate,
+               va.video_info->>'container_type'           AS container_type,
+               va.audio_info->>'audio_codec'              AS audio_codec,
+               (va.audio_info->>'channel')::int           AS audio_channel,
+               (va.audio_info->>'frequency')::int         AS audio_frequency,
+               (va.audio_info->>'audio_bitrate')::bigint  AS audio_bitrate
+        FROM unit u
+        LEFT JOIN folder f           ON f.id = u.id_folder
+        LEFT JOIN metadata m         ON m.id_unit = u.id
+        LEFT JOIN video_additional va ON va.id_unit = u.id
+        WHERE u.id = %s
+    """, (item_id,))
+    detail = dict(cur.fetchone() or {})
+
     cur.execute("""
         SELECT p.name
         FROM many_unit_has_many_person mp
@@ -405,7 +430,7 @@ def item_meta(item_id: int):
         WHERE mp.id_unit = %s AND p.name != ''
         ORDER BY p.name
     """, (item_id,))
-    persons = [r["name"] for r in cur.fetchall()]
+    detail["persons"] = [r["name"] for r in cur.fetchall()]
 
     cur.execute("""
         SELECT c.stem, mc.confidence
@@ -415,10 +440,10 @@ def item_meta(item_id: int):
         ORDER BY mc.confidence DESC
         LIMIT 20
     """, (item_id,))
-    concepts = [{"stem": r["stem"], "confidence": round(r["confidence"], 2)} for r in cur.fetchall()]
+    detail["concepts"] = [{"stem": r["stem"], "confidence": round(r["confidence"], 2)} for r in cur.fetchall()]
 
     conn.close()
-    return {"persons": persons, "concepts": concepts}
+    return detail
 
 
 # ---------------------------------------------------------------------------

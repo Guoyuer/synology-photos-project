@@ -22,6 +22,7 @@ export interface Camera {
   item_count: number
 }
 
+// Grid-essential fields returned by /api/collect
 export interface MediaItem {
   id: number
   filename: string
@@ -35,18 +36,14 @@ export interface MediaItem {
   height: number | null
   duration: number | null
   vres_x: number | null
-  vres_y: number | null
-  fps: number | null
-  video_codec: string | null
-  video_bitrate: number | null
-  container_type: string | null
-  audio_codec: string | null
-  audio_channel: number | null
-  audio_frequency: number | null
-  audio_bitrate: number | null
   country: string | null
   first_level: string | null
   district: string | null
+  camera: string | null
+}
+
+// Full metadata returned by /api/meta/{id} — used by MetaPanel
+export interface ItemMeta {
   folder_path: string | null
   camera: string | null
   lens: string | null
@@ -59,6 +56,19 @@ export interface MediaItem {
   description: string | null
   latitude: number | null
   longitude: number | null
+  duration: number | null
+  vres_x: number | null
+  vres_y: number | null
+  fps: number | null
+  video_codec: string | null
+  video_bitrate: number | null
+  container_type: string | null
+  audio_codec: string | null
+  audio_channel: number | null
+  audio_frequency: number | null
+  audio_bitrate: number | null
+  persons: string[]
+  concepts: { stem: string; confidence: number }[]
 }
 
 export interface CollectResult {

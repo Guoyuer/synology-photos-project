@@ -50,8 +50,7 @@ def _make_db(rows, description=None):
             ("id",), ("filename",), ("takentime",), ("item_type",),
             ("filesize",), ("duplicate_hash",), ("cache_key",),
             ("width",), ("height",), ("duration",), ("vres_x",),
-            ("fps",), ("country",), ("district",), ("camera",),
-            ("latitude",), ("longitude",),
+            ("country",), ("first_level",), ("district",), ("camera",),
         ]
 
     cur = MagicMock()
@@ -68,8 +67,7 @@ def _row_tuple(**kw):
         "id", "filename", "takentime", "item_type",
         "filesize", "duplicate_hash", "cache_key",
         "width", "height", "duration", "vres_x",
-        "fps", "country", "district", "camera",
-        "latitude", "longitude",
+        "country", "first_level", "district", "camera",
     ]
     return tuple(kw.get(c) for c in cols)
 

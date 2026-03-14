@@ -1,4 +1,4 @@
-import type { Camera, CollectRequest, CollectResult, Concept, Location, Person } from './types'
+import type { Camera, CollectRequest, CollectResult, Concept, ItemMeta, Location, Person } from './types'
 
 const BASE = '/api'
 
@@ -43,7 +43,7 @@ export function thumbnailUrl(id: number, cacheKey: string, size: 'sm' | 'md' | '
   return `${BASE}/thumbnail/${id}/${cacheKey}?size=${size}`
 }
 
-export function fetchItemMeta(id: number): Promise<{ persons: string[]; concepts: { stem: string; confidence: number }[] }> {
+export function fetchItemMeta(id: number): Promise<ItemMeta> {
   return apiFetch(`${BASE}/meta/${id}`)
 }
 
