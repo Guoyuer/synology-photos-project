@@ -57,8 +57,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
     count: rows.length,
     getScrollElement: () => scrollRef.current,
     estimateSize: () => rowHeight,
-    overscan: 3,
-    isScrollingResetDelay: 150,
+    overscan: 5,
   })
 
   const listVirtualizer = useVirtualizer({
@@ -96,7 +95,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
       {/* Toolbar */}
       <div className="flex items-center gap-4 px-4 py-3 bg-gray-900 border-b border-gray-700 shrink-0">
         <span className="text-gray-300 font-semibold">{items.length} items</span>
-        <span className="text-gray-500 text-sm">{totalMb.toFixed(1)} MB total</span>
+        <span className="text-gray-500 text-sm">{totalMb >= 1000 ? (totalMb / 1024).toFixed(1) + ' GB' : totalMb.toFixed(1) + ' MB'} total</span>
         <div className="ml-auto flex items-center gap-3">
           <button onClick={() => onSelectAll(items)} className="text-xs text-blue-400 hover:text-blue-300">Select all</button>
           <button onClick={() => onClearAll(items.map(i => i.id))} className="text-xs text-gray-400 hover:text-gray-300">Clear</button>
@@ -189,16 +188,15 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
                       className={`relative rounded overflow-hidden cursor-pointer border-2 transition-all
                         ${cartIds.has(item.id) ? 'border-blue-500' : 'border-transparent hover:border-gray-500'}`}
                     >
-                      {gridVirtualizer.isScrolling
-                        ? <div className="w-full h-32 bg-gray-800" />
-                        : <img src={thumbnailUrl(item.id, item.cache_key, 'sm')} alt={item.filename} className="w-full h-32 object-cover bg-gray-800"
-                            onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
-                      }
-                      <div className="absolute top-1 left-1">
-                        <span className={`text-xs px-1 py-0.5 rounded ${TYPE_BADGE[item.type_name] ?? 'bg-gray-700'} text-white`}>
-                          {item.type_name}
-                        </span>
-                      </div>
+                      <img src={thumbnailUrl(item.id, item.cache_key, 'sm')} alt={item.filename} title={item.filename} className="w-full h-32 object-cover bg-gray-800"
+                        onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
+                      {item.type_name !== 'photo' && (
+                        <div className="absolute top-1 left-1">
+                          <span className={`text-xs px-1 py-0.5 rounded ${TYPE_BADGE[item.type_name] ?? 'bg-gray-700'} text-white`}>
+                            {item.type_name}
+                          </span>
+                        </div>
+                      )}
                       {item.duration && (
                         <div className="absolute bottom-1 right-1 text-xs bg-black/70 text-white px-1 rounded">
                           {fmtDur(item.duration)}
@@ -209,8 +207,8 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
                           <span className="text-2xl">✓</span>
                         </div>
                       )}
-                      <div className="p-1.5">
-                        <p className="text-xs text-gray-300 truncate">{item.filename}</p>
+                      <div className="p-1.5" title={item.filename}>
+                        <p className="text-xs text-gray-300 truncate">{item.taken_iso?.slice(0, 10)}</p>
                         <p className="text-xs text-gray-500">{item.district ?? item.country ?? ''}</p>
                       </div>
                     </div>

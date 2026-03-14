@@ -55,6 +55,7 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
             onFiltersChange({ ...filters, personCount: `${op}${n}` })
           const isNone = filters.personCount === 'none'
           const isSolo = filters.personCount === '1'
+          const showPersonPicker = !isNone && filters.personCount !== ''
 
           return (
             <>
@@ -102,17 +103,18 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
                 </div>
               </div>
 
-              <MultiSelect
-                options={persons.map(p => ({ value: p.id, label: p.name, sub: `${p.item_count}` }))}
-                selected={filters.personIds}
-                onChange={v => {
-                  const ids = v as number[]
-                  const next = isSolo ? ids.slice(-1) : ids
-                  onFiltersChange({ ...filters, personIds: next })
-                }}
-                placeholder="Any named person..."
-                disabled={isNone}
-              />
+              {showPersonPicker && (
+                <MultiSelect
+                  options={persons.map(p => ({ value: p.id, label: p.name, sub: `${p.item_count}` }))}
+                  selected={filters.personIds}
+                  onChange={v => {
+                    const ids = v as number[]
+                    const next = isSolo ? ids.slice(-1) : ids
+                    onFiltersChange({ ...filters, personIds: next })
+                  }}
+                  placeholder="Any named person..."
+                />
+              )}
             </>
           )
         })()}
@@ -303,9 +305,9 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
           className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded text-sm text-gray-200" />
       </section>
 
-      <div className="flex gap-2 mt-2">
+      <div className="flex justify-center mt-2">
         <button onClick={() => onFiltersChange(DEFAULT_FILTERS)}
-          className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-sm transition-colors">
+          className="text-xs text-gray-500 hover:text-gray-300 underline transition-colors">
           Reset filters
         </button>
       </div>
