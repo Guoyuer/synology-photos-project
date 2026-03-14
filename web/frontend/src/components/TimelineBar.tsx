@@ -66,9 +66,6 @@ export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
   }, [drillStack, gran])
 
   const canGoBack = drillStack.length > 0 || gran !== 'year'
-  const backLabel = currentDrill
-    ? (drillStack.length > 1 ? drillStack[drillStack.length - 2].label : 'All')
-    : 'All'
 
   if (!bins.length && !canGoBack) return null
 
@@ -82,11 +79,10 @@ export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
       {canGoBack && (
         <button
           onClick={handleBack}
-          title={`Back to ${backLabel}`}
+          title="Back"
           className="shrink-0 flex items-center justify-center h-6 text-[9px] text-blue-400 hover:text-blue-300 hover:bg-gray-800 border-b border-gray-800 transition-colors gap-0.5"
         >
-          <span>{'<'}</span>
-          <span className="truncate">{backLabel}</span>
+          <span>{'< Back'}</span>
         </button>
       )}
 
