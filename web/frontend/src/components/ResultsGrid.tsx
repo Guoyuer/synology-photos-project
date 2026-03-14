@@ -1,6 +1,6 @@
 import { useRef, useState, useMemo, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
-import { thumbnailUrl } from '../api'
+import { downloadItems, thumbnailUrl } from '../api'
 import { fmt, fmtDur, TYPE_BADGE } from '../utils'
 import { ContextMenu } from './ContextMenu'
 import { Lightbox } from './Lightbox'
@@ -10,41 +10,42 @@ import type { MediaItem } from '../types'
 interface Props {
   items: MediaItem[]
   totalMb: number
+  cart: MediaItem[]
   cartIds: Set<number>
   sortDesc: boolean
   onSortToggle: () => void
   onToggle: (item: MediaItem) => void
   onSelectAll: (items: MediaItem[]) => void
   onClearAll: (ids: number[]) => void
+  onClearCart: () => void
+  onRemoveFromCart: (id: number) => void
 }
 
 const ITEM_W = 172  // approximate grid item width + gap
 
-export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll }: Props) {
+export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortToggle, onToggle, onSelectAll, onClearAll, onClearCart, onRemoveFromCart }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [preview, setPreview] = useState<MediaItem | null>(null)
   const [infoItem, setInfoItem] = useState<MediaItem | null>(null)
   const [ctxMenu, setCtxMenu] = useState<{ item: MediaItem; x: number; y: number } | null>(null)
+  const [cartExpanded, setCartExpanded] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [dlError, setDlError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const roRef = useRef<ResizeObserver | null>(null)
   const [containerWidth, setContainerWidth] = useState(800)
 
   const containerRef = useCallback((node: HTMLDivElement | null) => {
-    if (roRef.current) {
-      roRef.current.disconnect()
-      roRef.current = null
-    }
+    if (roRef.current) { roRef.current.disconnect(); roRef.current = null }
     if (!node) return
     setContainerWidth(node.offsetWidth)
-    const ro = new ResizeObserver(entries => {
-      setContainerWidth(entries[0].contentRect.width)
-    })
+    const ro = new ResizeObserver(entries => setContainerWidth(entries[0].contentRect.width))
     ro.observe(node)
     roRef.current = ro
   }, [])
 
   const cols = Math.max(1, Math.floor((containerWidth - 16) / ITEM_W))
-  const rowHeight = 200  // px: thumbnail 128 + text + padding
+  const rowHeight = 200
 
   const rows = useMemo(() => {
     const r: MediaItem[][] = []
@@ -72,8 +73,19 @@ export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, o
     setCtxMenu({ item, x: e.clientX, y: e.clientY })
   }
 
-  const selectedInView = items.filter(i => cartIds.has(i.id))
-  const selectedBytes = selectedInView.reduce((s, i) => s + (i.filesize || 0), 0)
+  const cartBytes = cart.reduce((s, i) => s + (i.filesize || 0), 0)
+
+  const handleDownload = async () => {
+    setDownloading(true)
+    setDlError(null)
+    try {
+      await downloadItems(cart.map(i => i.id))
+    } catch (e) {
+      setDlError(String(e))
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   if (items.length === 0) {
     return <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">No results</div>
@@ -88,9 +100,18 @@ export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, o
         <div className="ml-auto flex items-center gap-3">
           <button onClick={() => onSelectAll(items)} className="text-xs text-blue-400 hover:text-blue-300">Select all</button>
           <button onClick={() => onClearAll(items.map(i => i.id))} className="text-xs text-gray-400 hover:text-gray-300">Clear</button>
-          {selectedInView.length > 0 && (
-            <span className="text-xs text-yellow-400">{selectedInView.length} selected · {fmt(selectedBytes)}</span>
+
+          {/* Cart summary button */}
+          {cart.length > 0 && (
+            <button
+              onClick={() => setCartExpanded(e => !e)}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-400 border border-yellow-700/50 transition-colors"
+            >
+              🛒 {cart.length} selected · {fmt(cartBytes)}
+              <span className="text-yellow-600">{cartExpanded ? '▲' : '▼'}</span>
+            </button>
           )}
+
           <button
             onClick={onSortToggle}
             title={sortDesc ? 'Newest first — click for oldest first' : 'Oldest first — click for newest first'}
@@ -110,6 +131,45 @@ export function ResultsGrid({ items, totalMb, cartIds, sortDesc, onSortToggle, o
           </div>
         </div>
       </div>
+
+      {/* Cart dropdown */}
+      {cartExpanded && cart.length > 0 && (
+        <div className="shrink-0 bg-gray-900 border-b border-yellow-700/40">
+          <div className="max-h-56 overflow-y-auto">
+            {cart.map(item => (
+              <div key={item.id} className="flex items-center gap-3 px-4 py-2 hover:bg-gray-800 border-b border-gray-800">
+                <img src={thumbnailUrl(item.id, 'sm')} className="w-10 h-10 object-cover rounded bg-gray-700 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-200 truncate font-mono">{item.filename}</p>
+                  <p className="text-xs text-gray-500">
+                    <span className={`inline px-1 py-0.5 rounded text-white mr-1 ${TYPE_BADGE[item.type_name] ?? 'bg-gray-700'}`}>
+                      {item.type_name}
+                    </span>
+                    {fmt(item.filesize)}
+                    {item.duration ? ` · ${fmtDur(item.duration)}` : ''}
+                    {item.taken_iso ? ` · ${item.taken_iso.slice(0, 10)}` : ''}
+                  </p>
+                </div>
+                <button onClick={() => onRemoveFromCart(item.id)}
+                  className="text-gray-600 hover:text-red-400 text-lg leading-none px-1 transition-colors">×</button>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 border-t border-gray-700">
+            {dlError && <span className="text-red-400 text-xs flex-1">{dlError}</span>}
+            <div className="ml-auto flex gap-2">
+              <button onClick={onClearCart}
+                className="text-xs px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded transition-colors">
+                Clear cart
+              </button>
+              <button onClick={handleDownload} disabled={downloading}
+                className="text-xs px-4 py-1.5 bg-green-700 hover:bg-green-600 disabled:bg-gray-700 disabled:text-gray-500 text-white font-semibold rounded transition-colors">
+                {downloading ? 'Preparing…' : `Download ${cart.length} files`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Scrollable container */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">

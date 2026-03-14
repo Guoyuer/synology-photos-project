@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { fetchCameras, fetchConcepts, fetchLocations, fetchPersons, runCollect } from './api'
-import { CartBar } from './components/CartBar'
 import { FilterPanel } from './components/FilterPanel'
 import { ResultsGrid } from './components/ResultsGrid'
 import { useUrlFilters, type FilterState } from './hooks/useUrlFilters'
@@ -107,8 +106,10 @@ export default function App() {
         )}
         {!loading && result && (
           <ResultsGrid items={result.items} totalMb={result.total_mb}
-            cartIds={cartIds} onToggle={toggleCart}
+            cart={cart} cartIds={cartIds} onToggle={toggleCart}
             onSelectAll={addAllToCart} onClearAll={removeFromCart}
+            onClearCart={() => setCart([])}
+            onRemoveFromCart={id => setCart(prev => prev.filter(i => i.id !== id))}
             sortDesc={filters.sortDesc}
             onSortToggle={() => {
               const next = { ...filters, sortDesc: !filters.sortDesc }
@@ -122,8 +123,6 @@ export default function App() {
             <span className="text-lg">Set filters and search to find your vlog material</span>
           </div>
         )}
-        <CartBar cart={cart} onClear={() => setCart([])}
-          onRemove={id => setCart(prev => prev.filter(i => i.id !== id))} />
       </div>
     </div>
   )
