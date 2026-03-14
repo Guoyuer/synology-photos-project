@@ -30,18 +30,6 @@ function toRequest(f: FilterState): CollectRequest {
   }
 }
 
-function hasAnyFilter(f: FilterState): boolean {
-  return (
-    f.personIds.length > 0 || !!f.personCount ||
-    !!f.country || !!f.fromDate || !!f.toDate ||
-    f.itemTypes.length > 0 ||
-    f.selectedConcepts.length > 0 ||
-    f.selectedCameras.length > 0 ||
-    !!f.minDuration || !!f.maxDuration || !!f.minWidth || !!f.minFps ||
-    f.videoCodecs.length > 0 ||
-    !!f.hasAudio || !!f.hasGps
-  )
-}
 
 export default function App() {
   const [persons, setPersons] = useState<Person[]>([])
@@ -84,9 +72,8 @@ export default function App() {
     }
   }
 
-  // Auto-search on filter change with 400ms debounce
+  // Auto-search on filter change with 400ms debounce (runs on mount too for no-filter = show all)
   useEffect(() => {
-    if (!hasAnyFilter(filters)) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => handleSearch(toRequest(filters)), 400)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
@@ -141,12 +128,6 @@ export default function App() {
               setFilters(next)
               handleSearch(toRequest(next))
             }} />
-        )}
-        {!loading && !result && !error && (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-3">
-            <span className="text-5xl">🎬</span>
-            <span className="text-lg">Set filters to find your vlog material</span>
-          </div>
         )}
       </div>
     </div>
