@@ -51,19 +51,26 @@ export function Lightbox({ item, items, onClose, onNav }: Props) {
         </button>
       </div>
 
-      {/* Media */}
+      {/* Media — click on backdrop (outside media) closes; clicks/drags inside media are stopped */}
       <div className="flex-1 flex items-center justify-center min-h-0 relative"
         onClick={onClose}>
         {isVideo || isLive ? (
-          <video
-            key={item.id}
-            src={mediaUrl(item.id, isLive)}
-            controls
-            autoPlay
-            loop={isLive}
-            className="max-w-full max-h-full"
+          // Wrap in a div so all pointer events (click, mousedown, pointerdown)
+          // from both the video element and its native controls are stopped.
+          <div
             onClick={e => e.stopPropagation()}
-          />
+            onMouseDown={e => e.stopPropagation()}
+            onPointerDown={e => e.stopPropagation()}
+          >
+            <video
+              key={item.id}
+              src={mediaUrl(item.id, isLive)}
+              controls
+              autoPlay
+              loop={isLive}
+              className="max-w-full max-h-full"
+            />
+          </div>
         ) : (
           <img
             key={item.id}
