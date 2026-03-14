@@ -13,6 +13,9 @@ A two-part tool for browsing and downloading photos from a Synology NAS running 
 
 ### Python (CLI + backend)
 ```bash
+# Always activate the virtualenv first
+source venv/bin/activate
+
 # Run the CLI
 python cli.py --help
 python cli.py persons
