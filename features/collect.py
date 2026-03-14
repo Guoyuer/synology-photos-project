@@ -229,6 +229,7 @@ def query_items(
             u.item_type,
             u.filesize,
             u.duplicate_hash,
+            u.cache_key,
             (u.resolution->>'width')::int   AS width,
             (u.resolution->>'height')::int  AS height,
             va.duration,

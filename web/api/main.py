@@ -197,6 +197,17 @@ def collect(req: CollectRequest):
 @app.get("/api/thumbnail/{item_id}")
 def thumbnail(item_id: int, size: str = "sm"):
     size_map = {"sm": "sm", "md": "m", "lg": "xl"}
+
+    conn = db()
+    cur = conn.cursor()
+    cur.execute("SELECT cache_key FROM unit WHERE id = %s", (item_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Item not found")
+    cache_key = row["cache_key"]
+
     photos = get_session()
     url = photos.session._base_url + "entry.cgi"
     params = {
@@ -206,7 +217,7 @@ def thumbnail(item_id: int, size: str = "sm"):
         "id": item_id,
         "type": "unit",
         "size": size_map.get(size, "sm"),
-        "cache_key": "1",
+        "cache_key": cache_key,
         "SynoToken": photos.session.syno_token,
         "_sid": photos.session.sid,
     }
