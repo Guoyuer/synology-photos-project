@@ -14,7 +14,7 @@ def list_persons(photos, limit=None):
                 "version": 1,
                 "additional": json.dumps(["thumbnail"]),
                 "offset": 0,
-                "limit": 1000,
+                "limit": limit or 1000,
                 "show_more": False,
                 "show_hidden": False
             }
