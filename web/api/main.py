@@ -392,6 +392,8 @@ def thumbnail(item_id: int, size: str = "sm"):
         "SynoToken": photos.session.syno_token,
         "_sid": photos.session.sid,
     }
-    resp = requests.get(url, params=params, verify=photos.session._verify, stream=True, timeout=15)
+    resp = requests.get(url, params=params, verify=photos.session._verify, timeout=15)
     content_type = resp.headers.get("Content-Type", "image/jpeg")
-    return StreamingResponse(resp.iter_content(chunk_size=8192), media_type=content_type)
+    if "text/html" in content_type:
+        raise HTTPException(status_code=404, detail="Thumbnail not available")
+    return Response(content=resp.content, media_type=content_type)

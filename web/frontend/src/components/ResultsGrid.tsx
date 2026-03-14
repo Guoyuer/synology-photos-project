@@ -172,7 +172,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
       )}
 
       {/* Scrollable container */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden styled-scrollbar">
         {view === 'grid' ? (
           <div ref={containerRef} className="p-4">
             <div style={{ height: gridVirtualizer.getTotalSize(), position: 'relative' }}>
@@ -191,7 +191,8 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
                     >
                       {gridVirtualizer.isScrolling
                         ? <div className="w-full h-32 bg-gray-800" />
-                        : <img src={thumbnailUrl(item.id, 'sm')} alt={item.filename} className="w-full h-32 object-cover bg-gray-800" />
+                        : <img src={thumbnailUrl(item.id, 'sm')} alt={item.filename} className="w-full h-32 object-cover bg-gray-800"
+                            onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
                       }
                       <div className="absolute top-1 left-1">
                         <span className={`text-xs px-1 py-0.5 rounded ${TYPE_BADGE[item.type_name] ?? 'bg-gray-700'} text-white`}>
