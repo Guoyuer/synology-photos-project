@@ -5,7 +5,10 @@ import type { MediaItem } from '../types'
 interface Props {
   items: MediaItem[]
   totalMb: number
-  onAddToCart: (items: MediaItem[]) => void
+  cartIds: Set<number>
+  onToggle: (item: MediaItem) => void
+  onSelectAll: (items: MediaItem[]) => void
+  onClearAll: (ids: number[]) => void
 }
 
 const TYPE_BADGE: Record<string, string> = {
@@ -26,28 +29,11 @@ function fmtDur(ms: number | null) {
   return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`
 }
 
-export function ResultsGrid({ items, totalMb, onAddToCart }: Props) {
+export function ResultsGrid({ items, totalMb, cartIds, onToggle, onSelectAll, onClearAll }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
-  const [selected, setSelected] = useState<Set<number>>(new Set())
 
-  const toggleSelect = (id: number) => {
-    setSelected(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  const selectAll = () => setSelected(new Set(items.map(i => i.id)))
-  const clearAll = () => setSelected(new Set())
-
-  const selectedItems = items.filter(i => selected.has(i.id))
-  const selectedBytes = selectedItems.reduce((s, i) => s + (i.filesize || 0), 0)
-
-  const addToCart = () => {
-    onAddToCart(selectedItems)
-    clearAll()
-  }
+  const selectedInView = items.filter(i => cartIds.has(i.id))
+  const selectedBytes = selectedInView.reduce((s, i) => s + (i.filesize || 0), 0)
 
   if (items.length === 0) {
     return <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">No results</div>
@@ -60,16 +46,10 @@ export function ResultsGrid({ items, totalMb, onAddToCart }: Props) {
         <span className="text-gray-300 font-semibold">{items.length} items</span>
         <span className="text-gray-500 text-sm">{totalMb.toFixed(1)} MB total</span>
         <div className="ml-auto flex items-center gap-3">
-          <button onClick={selectAll} className="text-xs text-blue-400 hover:text-blue-300">Select all</button>
-          <button onClick={clearAll} className="text-xs text-gray-400 hover:text-gray-300">Clear</button>
-          {selected.size > 0 && (
-            <>
-              <span className="text-xs text-yellow-400">{selected.size} selected · {fmt(selectedBytes)}</span>
-              <button onClick={addToCart}
-                className="text-xs px-2 py-1 bg-green-700 hover:bg-green-600 text-white rounded transition-colors">
-                + Add to Cart
-              </button>
-            </>
+          <button onClick={() => onSelectAll(items)} className="text-xs text-blue-400 hover:text-blue-300">Select all</button>
+          <button onClick={() => onClearAll(items.map(i => i.id))} className="text-xs text-gray-400 hover:text-gray-300">Clear</button>
+          {selectedInView.length > 0 && (
+            <span className="text-xs text-yellow-400">{selectedInView.length} selected · {fmt(selectedBytes)}</span>
           )}
           <div className="flex gap-1">
             <button onClick={() => setView('grid')}
@@ -91,9 +71,9 @@ export function ResultsGrid({ items, totalMb, onAddToCart }: Props) {
             {items.map(item => (
               <div
                 key={item.id}
-                onClick={() => toggleSelect(item.id)}
+                onClick={() => onToggle(item)}
                 className={`relative rounded overflow-hidden cursor-pointer border-2 transition-all
-                  ${selected.has(item.id) ? 'border-blue-500' : 'border-transparent hover:border-gray-500'}`}
+                  ${cartIds.has(item.id) ? 'border-blue-500' : 'border-transparent hover:border-gray-500'}`}
               >
                 <img
                   src={thumbnailUrl(item.id, 'sm')}
@@ -111,7 +91,7 @@ export function ResultsGrid({ items, totalMb, onAddToCart }: Props) {
                     {fmtDur(item.duration)}
                   </div>
                 )}
-                {selected.has(item.id) && (
+                {cartIds.has(item.id) && (
                   <div className="absolute inset-0 bg-blue-500/20 flex items-center justify-center">
                     <span className="text-2xl">✓</span>
                   </div>
@@ -139,8 +119,8 @@ export function ResultsGrid({ items, totalMb, onAddToCart }: Props) {
             <tbody>
               {items.map(item => (
                 <tr key={item.id}
-                  onClick={() => toggleSelect(item.id)}
-                  className={`border-b border-gray-800 cursor-pointer ${selected.has(item.id) ? 'bg-blue-900/30' : 'hover:bg-gray-800'}`}
+                  onClick={() => onToggle(item)}
+                  className={`border-b border-gray-800 cursor-pointer ${cartIds.has(item.id) ? 'bg-blue-900/30' : 'hover:bg-gray-800'}`}
                 >
                   <td className="py-2 pr-3 font-mono text-xs max-w-xs truncate">{item.filename}</td>
                   <td className="py-2 pr-3">

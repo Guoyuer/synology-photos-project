@@ -39,11 +39,24 @@ export default function App() {
     }
   }
 
-  const addToCart = (items: MediaItem[]) => {
+  const cartIds = new Set(cart.map(i => i.id))
+
+  const toggleCart = (item: MediaItem) => {
+    setCart(prev =>
+      prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [...prev, item]
+    )
+  }
+
+  const addAllToCart = (items: MediaItem[]) => {
     setCart(prev => {
       const ids = new Set(prev.map(i => i.id))
       return [...prev, ...items.filter(i => !ids.has(i.id))]
     })
+  }
+
+  const removeFromCart = (ids: number[]) => {
+    const remove = new Set(ids)
+    setCart(prev => prev.filter(i => !remove.has(i.id)))
   }
 
   return (
@@ -64,7 +77,9 @@ export default function App() {
           <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">Searching…</div>
         )}
         {!loading && result && (
-          <ResultsGrid items={result.items} totalMb={result.total_mb} onAddToCart={addToCart} />
+          <ResultsGrid items={result.items} totalMb={result.total_mb}
+            cartIds={cartIds} onToggle={toggleCart}
+            onSelectAll={addAllToCart} onClearAll={removeFromCart} />
         )}
         {!loading && !result && !error && (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-3">
