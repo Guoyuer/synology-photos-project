@@ -191,50 +191,6 @@ def collect(req: CollectRequest):
 
 
 # ---------------------------------------------------------------------------
-# Schema + raw SQL
-# ---------------------------------------------------------------------------
-
-@app.get("/api/schema")
-def get_schema():
-    path = os.path.join(os.path.dirname(__file__), "../../SYNOFOTO_DB_GUIDE.md")
-    with open(path) as f:
-        return {"schema": f.read()}
-
-
-class SqlRequest(BaseModel):
-    sql: str
-
-
-@app.post("/api/sql")
-def run_sql(req: SqlRequest):
-    sql = req.sql.strip()
-    first = sql.split()[0].upper() if sql else ""
-    if first not in ("SELECT", "WITH"):
-        raise HTTPException(status_code=400, detail="Only SELECT/WITH queries are allowed")
-
-    def _safe(v):
-        if v is None or isinstance(v, (int, float, bool, str)):
-            return v
-        return str(v)
-
-    conn = db()
-    cur = conn.cursor()
-    try:
-        cur.execute(sql)
-        rows = cur.fetchall()
-        columns = [d.name for d in cur.description] if cur.description else []
-        return {
-            "columns": columns,
-            "rows": [[_safe(v) for v in r.values()] for r in rows],
-            "count": len(rows),
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    finally:
-        conn.close()
-
-
-# ---------------------------------------------------------------------------
 # Thumbnail proxy
 # ---------------------------------------------------------------------------
 

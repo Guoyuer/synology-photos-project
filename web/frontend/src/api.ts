@@ -1,4 +1,4 @@
-import type { Camera, CollectRequest, CollectResult, Concept, Location, Person, SqlResult } from './types'
+import type { Camera, CollectRequest, CollectResult, Concept, Location, Person } from './types'
 
 const BASE = '/api'
 
@@ -29,25 +29,6 @@ export async function runCollect(req: CollectRequest): Promise<CollectResult> {
     body: JSON.stringify(req),
   })
   if (!res.ok) throw new Error(await res.text())
-  return res.json()
-}
-
-export async function fetchSchema(): Promise<string> {
-  const res = await fetch(`${BASE}/schema`)
-  const data = await res.json()
-  return data.schema
-}
-
-export async function runSql(sql: string): Promise<SqlResult> {
-  const res = await fetch(`${BASE}/sql`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ sql }),
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(data.detail ?? res.statusText)
-  }
   return res.json()
 }
 

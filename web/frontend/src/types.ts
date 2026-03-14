@@ -48,12 +48,6 @@ export interface CollectResult {
   total_mb: number
 }
 
-export interface SqlResult {
-  columns: string[]
-  rows: (string | number | boolean | null)[][]
-  count: number
-}
-
 export interface CollectRequest {
   person_ids: number[]
   all_persons: boolean
