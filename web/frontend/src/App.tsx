@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { fetchCameras, fetchConcepts, fetchLocations, fetchPersons, runCollect, runSql } from './api'
+import { askQuestion, fetchCameras, fetchConcepts, fetchLocations, fetchPersons, runCollect, runSql } from './api'
 import { FilterPanel } from './components/FilterPanel'
 import { ResultsGrid } from './components/ResultsGrid'
 import { SqlPanel } from './components/SqlPanel'
@@ -33,25 +33,25 @@ export default function App() {
   const handleSearch = async (req: CollectRequest) => {
     setFilterLoading(true)
     setError(null)
-    try {
-      setFilterResult(await runCollect(req))
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setFilterLoading(false)
-    }
+    try { setFilterResult(await runCollect(req)) }
+    catch (e) { setError(String(e)) }
+    finally { setFilterLoading(false) }
+  }
+
+  const handleAsk = async (question: string) => {
+    setSqlLoading(true)
+    setError(null)
+    try { setSqlResult(await askQuestion(question)) }
+    catch (e) { setError(String(e)) }
+    finally { setSqlLoading(false) }
   }
 
   const handleSql = async (sql: string) => {
     setSqlLoading(true)
     setError(null)
-    try {
-      setSqlResult(await runSql(sql))
-    } catch (e) {
-      setError(String(e))
-    } finally {
-      setSqlLoading(false)
-    }
+    try { setSqlResult(await runSql(sql)) }
+    catch (e) { setError(String(e)) }
+    finally { setSqlLoading(false) }
   }
 
   const tab = (active: boolean) =>
@@ -63,7 +63,7 @@ export default function App() {
       <div className="flex items-center gap-3 px-4 py-2 bg-gray-900 border-b border-gray-700 shrink-0">
         <span className="text-sm font-bold text-white mr-2">📸 Photo Collect</span>
         <button onClick={() => setMode('filters')} className={tab(mode === 'filters')}>Filters</button>
-        <button onClick={() => setMode('sql')} className={tab(mode === 'sql')}>SQL</button>
+        <button onClick={() => setMode('sql')} className={tab(mode === 'sql')}>Ask AI</button>
       </div>
 
       <div className="flex flex-1 min-h-0">
@@ -71,7 +71,8 @@ export default function App() {
         {mode === 'filters'
           ? <FilterPanel persons={persons} locations={locations} concepts={concepts} cameras={cameras}
               onSearch={handleSearch} loading={filterLoading} />
-          : <SqlPanel onRun={handleSql} loading={sqlLoading} />
+          : <SqlPanel onAsk={handleAsk} onSql={handleSql} loading={sqlLoading}
+              generatedSql={sqlResult?.sql ?? null} />
         }
 
         {/* Right panel */}
@@ -90,7 +91,7 @@ export default function App() {
                   </div>
           ) : (
             sqlLoading
-              ? <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">Running…</div>
+              ? <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">Thinking…</div>
               : <SqlResultsTable result={sqlResult} />
           )}
         </div>

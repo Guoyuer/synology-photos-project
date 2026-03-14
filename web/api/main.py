@@ -191,27 +191,21 @@ def collect(req: CollectRequest):
 
 
 # ---------------------------------------------------------------------------
-# Schema + raw SQL
+# Natural language → SQL (via Claude) + execution
 # ---------------------------------------------------------------------------
 
-@app.get("/api/schema")
-def get_schema():
-    path = os.path.join(os.path.dirname(__file__), "../../SYNOFOTO_DB_GUIDE.md")
-    with open(path) as f:
-        return {"schema": f.read()}
+_schema_cache: str | None = None
+
+def _get_schema() -> str:
+    global _schema_cache
+    if _schema_cache is None:
+        path = os.path.join(os.path.dirname(__file__), "../../SYNOFOTO_DB_GUIDE.md")
+        with open(path) as f:
+            _schema_cache = f.read()
+    return _schema_cache
 
 
-class SqlRequest(BaseModel):
-    sql: str
-
-
-@app.post("/api/sql")
-def run_sql(req: SqlRequest):
-    sql = req.sql.strip()
-    first = sql.split()[0].upper() if sql else ""
-    if first not in ("SELECT", "WITH"):
-        raise HTTPException(status_code=400, detail="Only SELECT/WITH queries are allowed")
-
+def _run_select(sql: str) -> dict:
     def _safe(v):
         if v is None or isinstance(v, (int, float, bool, str)):
             return v
@@ -229,9 +223,62 @@ def run_sql(req: SqlRequest):
             "count": len(rows),
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"SQL error: {e}")
     finally:
         conn.close()
+
+
+class AskRequest(BaseModel):
+    question: str
+
+
+@app.post("/api/ask")
+def ask(req: AskRequest):
+    import anthropic
+    schema = _get_schema()
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+    message = client.messages.create(
+        model="claude-opus-4-6",
+        max_tokens=1024,
+        system=(
+            "You are a SQL expert. The user has a PostgreSQL database called synofoto "
+            "containing their personal photo/video library on a Synology NAS.\n\n"
+            "Database schema:\n" + schema + "\n\n"
+            "Return ONLY the raw SQL SELECT query with no explanation, no markdown, "
+            "no code fences. The query must start with SELECT or WITH."
+        ),
+        messages=[{"role": "user", "content": req.question}],
+    )
+    sql = message.content[0].text.strip()
+    # Strip accidental markdown fences
+    if sql.startswith("```"):
+        sql = "\n".join(
+            line for line in sql.splitlines()
+            if not line.startswith("```")
+        ).strip()
+
+    first = sql.split()[0].upper() if sql else ""
+    if first not in ("SELECT", "WITH"):
+        raise HTTPException(status_code=400, detail=f"Model returned non-SELECT query: {sql[:200]}")
+
+    result = _run_select(sql)
+    result["sql"] = sql
+    return result
+
+
+class SqlRequest(BaseModel):
+    sql: str
+
+
+@app.post("/api/sql")
+def run_sql(req: SqlRequest):
+    sql = req.sql.strip()
+    first = sql.split()[0].upper() if sql else ""
+    if first not in ("SELECT", "WITH"):
+        raise HTTPException(status_code=400, detail="Only SELECT/WITH queries are allowed")
+    result = _run_select(sql)
+    result["sql"] = sql
+    return result
 
 
 # ---------------------------------------------------------------------------

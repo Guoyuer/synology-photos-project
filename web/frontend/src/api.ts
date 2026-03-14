@@ -32,13 +32,20 @@ export async function runCollect(req: CollectRequest): Promise<CollectResult> {
   return res.json()
 }
 
-export async function fetchSchema(): Promise<string> {
-  const res = await fetch(`${BASE}/schema`)
-  const data = await res.json()
-  return data.schema
+export async function askQuestion(question: string): Promise<SqlResult & { sql: string }> {
+  const res = await fetch(`${BASE}/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(data.detail ?? res.statusText)
+  }
+  return res.json()
 }
 
-export async function runSql(sql: string): Promise<SqlResult> {
+export async function runSql(sql: string): Promise<SqlResult & { sql: string }> {
   const res = await fetch(`${BASE}/sql`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

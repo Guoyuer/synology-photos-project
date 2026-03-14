@@ -49,6 +49,7 @@ export interface CollectResult {
 }
 
 export interface SqlResult {
+  sql: string
   columns: string[]
   rows: (string | number | boolean | null)[][]
   count: number
