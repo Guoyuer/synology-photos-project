@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { fetchCameras, fetchConcepts, fetchLocations, fetchPersons, runCollect } from './api'
 import { FilterPanel } from './components/FilterPanel'
 import { ResultsGrid } from './components/ResultsGrid'
@@ -30,6 +30,19 @@ function toRequest(f: FilterState): CollectRequest {
   }
 }
 
+function hasAnyFilter(f: FilterState): boolean {
+  return (
+    f.personIds.length > 0 ||
+    !!f.country || !!f.fromDate || !!f.toDate ||
+    f.itemTypes.length > 0 ||
+    f.selectedConcepts.length > 0 ||
+    f.selectedCameras.length > 0 ||
+    !!f.minDuration || !!f.maxDuration || !!f.minWidth || !!f.minFps ||
+    f.videoCodecs.length > 0 ||
+    !!f.hasAudio || !!f.hasGps
+  )
+}
+
 export default function App() {
   const [persons, setPersons] = useState<Person[]>([])
   const [locations, setLocations] = useState<Location[]>([])
@@ -40,6 +53,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [cart, setCart] = useState<MediaItem[]>([])
   const { filters, setFilters } = useUrlFilters()
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     Promise.all([fetchPersons(), fetchLocations(), fetchConcepts(), fetchCameras()])
@@ -64,6 +78,14 @@ export default function App() {
       setLoading(false)
     }
   }
+
+  // Auto-search on filter change with 400ms debounce
+  useEffect(() => {
+    if (!hasAnyFilter(filters)) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => handleSearch(toRequest(filters)), 400)
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [filters])
 
   const cartIds = new Set(cart.map(i => i.id))
 
@@ -94,8 +116,6 @@ export default function App() {
         cameras={cameras}
         filters={filters}
         onFiltersChange={setFilters}
-        onSearch={handleSearch}
-        loading={loading}
       />
       <div className="flex-1 flex flex-col min-w-0">
         {error && (
@@ -120,7 +140,7 @@ export default function App() {
         {!loading && !result && !error && (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-3">
             <span className="text-5xl">🎬</span>
-            <span className="text-lg">Set filters and search to find your vlog material</span>
+            <span className="text-lg">Set filters to find your vlog material</span>
           </div>
         )}
       </div>

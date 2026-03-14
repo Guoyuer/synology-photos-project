@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Camera, CollectRequest, Concept, Location, Person } from '../types'
+import type { Camera, Concept, Location, Person } from '../types'
 import { MultiSelect } from './MultiSelect'
 import { DEFAULT_FILTERS, type FilterState } from '../hooks/useUrlFilters'
 
@@ -10,8 +10,6 @@ interface Props {
   cameras: Camera[]
   filters: FilterState
   onFiltersChange: (f: FilterState) => void
-  onSearch: (req: CollectRequest) => void
-  loading: boolean
 }
 
 const ITEM_TYPES = [
@@ -21,7 +19,7 @@ const ITEM_TYPES = [
   { value: 6, label: 'Motion Photo' },
 ]
 
-export function FilterPanel({ persons, locations, concepts, cameras, filters, onFiltersChange, onSearch, loading }: Props) {
+export function FilterPanel({ persons, locations, concepts, cameras, filters, onFiltersChange }: Props) {
   const set = <K extends keyof FilterState>(key: K, value: FilterState[K]) =>
     onFiltersChange({ ...filters, [key]: value })
 
@@ -39,31 +37,6 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
         .filter(l => l.country === filters.country && (!filters.firstLevel || l.first_level === filters.firstLevel) && l.second_level)
         .map(l => l.second_level)
     )].filter(Boolean).sort(), [locations, filters.country, filters.firstLevel])
-
-  const submit = () => {
-    onSearch({
-      person_ids: filters.personIds,
-      all_persons: filters.allPersons,
-      country: filters.country || null,
-      first_level: filters.firstLevel || null,
-      district: filters.district || null,
-      from_date: filters.fromDate || null,
-      to_date: filters.toDate || null,
-      item_types: filters.itemTypes,
-      concepts: filters.selectedConcepts,
-      min_confidence: filters.minConfidence,
-      cameras: filters.selectedCameras,
-      min_duration: filters.minDuration ? parseInt(filters.minDuration) : null,
-      min_width: filters.minWidth ? parseInt(filters.minWidth) : null,
-      max_duration: filters.maxDuration ? parseInt(filters.maxDuration) : null,
-      min_fps: filters.minFps ? parseInt(filters.minFps) : null,
-      video_codecs: filters.videoCodecs,
-      has_audio: filters.hasAudio === 'yes' ? true : filters.hasAudio === 'no' ? false : null,
-      has_gps: filters.hasGps === 'yes' ? true : filters.hasGps === 'no' ? false : null,
-      limit: filters.limit ? parseInt(filters.limit) : null,
-      sort_desc: filters.sortDesc,
-    })
-  }
 
   return (
     <div className="bg-gray-900 border-r border-gray-700 w-96 p-4 flex flex-col gap-4 overflow-y-auto">
@@ -272,13 +245,9 @@ export function FilterPanel({ persons, locations, concepts, cameras, filters, on
       </section>
 
       <div className="flex gap-2 mt-2">
-        <button onClick={submit} disabled={loading}
-          className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 text-white font-semibold rounded text-sm transition-colors">
-          {loading ? 'Searching...' : 'Search'}
-        </button>
         <button onClick={() => onFiltersChange(DEFAULT_FILTERS)}
-          className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-sm transition-colors">
-          Reset
+          className="w-full px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded text-sm transition-colors">
+          Reset filters
         </button>
       </div>
     </div>
