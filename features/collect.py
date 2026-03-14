@@ -239,12 +239,12 @@ def query_items(
     if has_audio is True:
         conditions.append(
             "(u.item_type != 1 OR EXISTS (SELECT 1 FROM video_additional va7 WHERE va7.id_unit = u.id "
-            "AND va7.audio_info->>'audio_codec' IS NOT NULL))"
+            "AND va7.audio_info->>'audio_codec' IS NOT NULL AND va7.audio_info->>'audio_codec' != ''))"
         )
     elif has_audio is False:
         conditions.append(
             "(u.item_type != 1 OR EXISTS (SELECT 1 FROM video_additional va7 WHERE va7.id_unit = u.id "
-            "AND (va7.audio_info IS NULL OR va7.audio_info->>'audio_codec' IS NULL)))"
+            "AND (va7.audio_info IS NULL OR NULLIF(va7.audio_info->>'audio_codec', '') IS NULL)))"
         )
     if has_gps is True:
         conditions.append("u.id_geocoding IS NOT NULL")
