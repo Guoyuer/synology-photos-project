@@ -193,6 +193,45 @@ def collect(req: CollectRequest):
 
 
 # ---------------------------------------------------------------------------
+# Bulk download (streams Synology zip)
+# ---------------------------------------------------------------------------
+
+class DownloadRequest(BaseModel):
+    item_ids: list[int]
+
+
+@app.post("/api/download")
+def download_files(req: DownloadRequest):
+    import json as _json
+    photos = get_session()
+    url = photos.session._base_url + "entry.cgi"
+    data = {
+        "api": "SYNO.Foto.Download",
+        "method": "download",
+        "version": "2",
+        "item_id": _json.dumps(req.item_ids),
+        "download_type": "source",
+        "force_download": "true",
+        "_sid": photos.session.sid,
+    }
+    resp = requests.post(
+        url,
+        params={"SynoToken": photos.session.syno_token},
+        data=data,
+        verify=photos.session._verify,
+        stream=True,
+        timeout=600,
+    )
+    content_type = resp.headers.get("Content-Type", "application/zip")
+    disposition = resp.headers.get("Content-Disposition", "attachment; filename=photos.zip")
+    return StreamingResponse(
+        resp.iter_content(chunk_size=65536),
+        media_type=content_type,
+        headers={"Content-Disposition": disposition},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Thumbnail proxy
 # ---------------------------------------------------------------------------
 

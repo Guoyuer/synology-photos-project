@@ -5,6 +5,7 @@ import type { MediaItem } from '../types'
 interface Props {
   items: MediaItem[]
   totalMb: number
+  onAddToCart: (items: MediaItem[]) => void
 }
 
 const TYPE_BADGE: Record<string, string> = {
@@ -25,7 +26,7 @@ function fmtDur(ms: number | null) {
   return s >= 60 ? `${Math.floor(s / 60)}m${s % 60}s` : `${s}s`
 }
 
-export function ResultsGrid({ items, totalMb }: Props) {
+export function ResultsGrid({ items, totalMb, onAddToCart }: Props) {
   const [view, setView] = useState<'grid' | 'list'>('grid')
   const [selected, setSelected] = useState<Set<number>>(new Set())
 
@@ -40,6 +41,14 @@ export function ResultsGrid({ items, totalMb }: Props) {
   const selectAll = () => setSelected(new Set(items.map(i => i.id)))
   const clearAll = () => setSelected(new Set())
 
+  const selectedItems = items.filter(i => selected.has(i.id))
+  const selectedBytes = selectedItems.reduce((s, i) => s + (i.filesize || 0), 0)
+
+  const addToCart = () => {
+    onAddToCart(selectedItems)
+    clearAll()
+  }
+
   if (items.length === 0) {
     return <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">No results</div>
   }
@@ -53,7 +62,15 @@ export function ResultsGrid({ items, totalMb }: Props) {
         <div className="ml-auto flex items-center gap-3">
           <button onClick={selectAll} className="text-xs text-blue-400 hover:text-blue-300">Select all</button>
           <button onClick={clearAll} className="text-xs text-gray-400 hover:text-gray-300">Clear</button>
-          {selected.size > 0 && <span className="text-xs text-yellow-400">{selected.size} selected</span>}
+          {selected.size > 0 && (
+            <>
+              <span className="text-xs text-yellow-400">{selected.size} selected · {fmt(selectedBytes)}</span>
+              <button onClick={addToCart}
+                className="text-xs px-2 py-1 bg-green-700 hover:bg-green-600 text-white rounded transition-colors">
+                + Add to Cart
+              </button>
+            </>
+          )}
           <div className="flex gap-1">
             <button onClick={() => setView('grid')}
               className={`px-2 py-1 rounded text-xs ${view === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}>

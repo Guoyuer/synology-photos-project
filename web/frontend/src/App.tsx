@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { fetchCameras, fetchConcepts, fetchLocations, fetchPersons, runCollect } from './api'
+import { CartBar } from './components/CartBar'
 import { FilterPanel } from './components/FilterPanel'
 import { ResultsGrid } from './components/ResultsGrid'
-import type { Camera, CollectRequest, CollectResult, Concept, Location, Person } from './types'
+import type { Camera, CollectRequest, CollectResult, Concept, Location, MediaItem, Person } from './types'
 
 export default function App() {
   const [persons, setPersons] = useState<Person[]>([])
@@ -12,6 +13,7 @@ export default function App() {
   const [result, setResult] = useState<CollectResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [cart, setCart] = useState<MediaItem[]>([])
 
   useEffect(() => {
     Promise.all([fetchPersons(), fetchLocations(), fetchConcepts(), fetchCameras()])
@@ -37,6 +39,13 @@ export default function App() {
     }
   }
 
+  const addToCart = (items: MediaItem[]) => {
+    setCart(prev => {
+      const ids = new Set(prev.map(i => i.id))
+      return [...prev, ...items.filter(i => !ids.has(i.id))]
+    })
+  }
+
   return (
     <div className="flex h-screen bg-gray-950 text-gray-100 overflow-hidden">
       <FilterPanel
@@ -55,7 +64,7 @@ export default function App() {
           <div className="flex-1 flex items-center justify-center text-gray-500 text-lg">Searching…</div>
         )}
         {!loading && result && (
-          <ResultsGrid items={result.items} totalMb={result.total_mb} />
+          <ResultsGrid items={result.items} totalMb={result.total_mb} onAddToCart={addToCart} />
         )}
         {!loading && !result && !error && (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-600 gap-3">
@@ -63,6 +72,7 @@ export default function App() {
             <span className="text-lg">Set filters and search to find your vlog material</span>
           </div>
         )}
+        <CartBar cart={cart} onClear={() => setCart([])} />
       </div>
     </div>
   )
