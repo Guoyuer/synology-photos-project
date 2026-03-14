@@ -280,9 +280,15 @@ describe('handleBinBack', () => {
     expect(r.dateFilter).toBeNull()
   })
 
-  it('back from auto top-level quarter clears filter and zooms to year', () => {
+  it('back from auto top-level quarter clears filter and forces year granularity', () => {
     const r = handleBinBack('quarter', [], 'quarter' as Granularity)
-    expect(r.newTopGran).toBeNull()
+    expect(r.newTopGran).toBe('year')  // explicit 'year', not null, to avoid auto-detect bouncing back to quarter
+    expect(r.dateFilter).toBeNull()
+  })
+
+  it('back from auto top-level month forces quarter (not null) so auto-detect cannot re-trigger month', () => {
+    const r = handleBinBack('month', [], null)
+    expect(r.newTopGran).toBe('quarter')
     expect(r.dateFilter).toBeNull()
   })
 

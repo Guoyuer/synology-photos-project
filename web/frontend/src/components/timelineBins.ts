@@ -182,6 +182,7 @@ export function handleBinBack(gran: Granularity, drillStack: DrillLevel[], topGr
     return { newDrillStack: newStack, newTopGran: topGran, dateFilter: null }
   }
   // At forced/auto top level — zoom out one notch
-  const newTopGran = gran === 'month' ? 'quarter' : null
+  // Use explicit 'year' (not null) so auto-detect doesn't bounce back to quarter
+  const newTopGran: Granularity | null = gran === 'month' ? 'quarter' : 'year'
   return { newDrillStack: [], newTopGran, dateFilter: null }
 }

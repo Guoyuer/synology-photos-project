@@ -5,9 +5,9 @@
  * bar width = count). Supports drill-down: clicking a year/quarter
  * zooms into months; clicking a month sets the date filter.
  */
-import { useMemo, useCallback, useState } from 'react'
+import { useMemo, useCallback, useState, useEffect, useRef } from 'react'
 import type { MediaItem } from '../types'
-import { computeBins, handleBinClick, handleBinBack, type DrillLevel } from './timelineBins'
+import { computeBins, handleBinClick, handleBinBack, type DrillLevel, type Granularity } from './timelineBins'
 
 interface Props {
   items: MediaItem[]
@@ -20,6 +20,16 @@ export function TimelineBar({ items, onDateFilter, onClearDateFilter, onScrollTo
   const [drillStack, setDrillStack] = useState<DrillLevel[]>([])
   // Forced top-level granularity when user navigates "back" from auto-detected level
   const [topGran, setTopGran] = useState<Granularity | null>(null)
+
+  // Reset drill state when items are replaced by a new search (external filter change)
+  const prevItemsRef = useRef(items)
+  useEffect(() => {
+    if (prevItemsRef.current !== items) {
+      prevItemsRef.current = items
+      setDrillStack([])
+      setTopGran(null)
+    }
+  }, [items])
 
   const currentDrill = drillStack.length > 0 ? drillStack[drillStack.length - 1] : null
 
