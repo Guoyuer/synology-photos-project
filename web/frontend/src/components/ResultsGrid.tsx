@@ -172,23 +172,21 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
       )}
 
       {/* Scrollable container */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
         {view === 'grid' ? (
           <div ref={containerRef} className="p-4">
             <div style={{ height: gridVirtualizer.getTotalSize(), position: 'relative' }}>
               {gridVirtualizer.getVirtualItems().map(vrow => (
                 <div
                   key={vrow.key}
-                  style={{ position: 'absolute', top: vrow.start, left: 0, right: 0, height: rowHeight }}
-                  className="flex gap-3"
+                  style={{ position: 'absolute', top: vrow.start, left: 0, right: 0, height: rowHeight, display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: '12px' }}
                 >
                   {rows[vrow.index].map(item => (
                     <div
                       key={item.id}
-                      style={{ width: `${100 / cols}%` }}
                       onClick={() => onToggle(item)}
                       onContextMenu={e => openCtxMenu(e, item)}
-                      className={`relative rounded overflow-hidden cursor-pointer border-2 transition-all shrink-0
+                      className={`relative rounded overflow-hidden cursor-pointer border-2 transition-all
                         ${cartIds.has(item.id) ? 'border-blue-500' : 'border-transparent hover:border-gray-500'}`}
                     >
                       {gridVirtualizer.isScrolling
