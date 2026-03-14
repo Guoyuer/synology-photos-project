@@ -126,7 +126,6 @@ def list_cameras():
         WHERE camera IS NOT NULL AND camera != ''
         GROUP BY camera
         ORDER BY item_count DESC
-        LIMIT 50
     """)
     rows = [dict(r) for r in cur.fetchall()]
     conn.close()
@@ -151,6 +150,11 @@ class CollectRequest(BaseModel):
     cameras: list[str] = []
     min_duration: Optional[int] = None   # seconds
     min_width: Optional[int] = None
+    max_duration: Optional[int] = None
+    min_fps: Optional[int] = None
+    video_codecs: list[str] = []
+    has_audio: Optional[bool] = None
+    has_gps: Optional[bool] = None
     limit: Optional[int] = None
     sort_desc: bool = False
 
@@ -180,6 +184,11 @@ def collect(req: CollectRequest):
         cameras=req.cameras,
         min_duration_s=req.min_duration,
         min_width=req.min_width,
+        max_duration_s=req.max_duration,
+        min_fps=req.min_fps,
+        video_codecs=req.video_codecs,
+        has_audio=req.has_audio,
+        has_gps=req.has_gps,
         limit=req.limit,
         sort_desc=req.sort_desc,
     )

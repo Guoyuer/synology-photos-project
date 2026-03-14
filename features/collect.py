@@ -108,6 +108,11 @@ def query_items(
     cameras: list[str] = [],             # camera model names
     min_duration_s: int | None = None,   # minimum video duration in seconds
     min_width: int | None = None,        # minimum video width (e.g. 3840 for 4K)
+    max_duration_s: int | None = None,   # maximum video duration (seconds)
+    min_fps: int | None = None,          # minimum frame rate (fps, not millihertz)
+    video_codecs: list[str] = [],        # ["hevc", "h264", "vp9"]
+    has_audio: bool | None = None,       # True=must have audio, False=no audio
+    has_gps: bool | None = None,         # True=must have GPS, False=no GPS
     limit: int | None = None,
     sort_desc: bool = False,
 ) -> list[dict]:
@@ -211,6 +216,40 @@ def query_items(
             "AND (va3.video_info->>'resolution_x')::int >= %s))"
         )
         params.append(min_width)
+    if max_duration_s is not None:
+        conditions.append(
+            "(u.item_type != 1 OR EXISTS "
+            "(SELECT 1 FROM video_additional va4 WHERE va4.id_unit = u.id AND va4.duration <= %s))"
+        )
+        params.append(max_duration_s * 1000)
+    if min_fps is not None:
+        conditions.append(
+            "(u.item_type != 1 OR EXISTS (SELECT 1 FROM video_additional va5 WHERE va5.id_unit = u.id "
+            "AND (CASE WHEN (va5.video_info->>'frame_rate_num')::int >= 1000 "
+            "     THEN (va5.video_info->>'frame_rate_num')::int / 1000 "
+            "     ELSE (va5.video_info->>'frame_rate_num')::int END) >= %s))"
+        )
+        params.append(min_fps)
+    if video_codecs:
+        conditions.append(
+            "(u.item_type != 1 OR EXISTS (SELECT 1 FROM video_additional va6 WHERE va6.id_unit = u.id "
+            "AND va6.video_info->>'video_codec' = ANY(%s)))"
+        )
+        params.append(video_codecs)
+    if has_audio is True:
+        conditions.append(
+            "(u.item_type != 1 OR EXISTS (SELECT 1 FROM video_additional va7 WHERE va7.id_unit = u.id "
+            "AND va7.audio_info->>'audio_codec' IS NOT NULL))"
+        )
+    elif has_audio is False:
+        conditions.append(
+            "(u.item_type != 1 OR EXISTS (SELECT 1 FROM video_additional va7 WHERE va7.id_unit = u.id "
+            "AND (va7.audio_info IS NULL OR va7.audio_info->>'audio_codec' IS NULL)))"
+        )
+    if has_gps is True:
+        conditions.append("u.id_geocoding IS NOT NULL")
+    elif has_gps is False:
+        conditions.append("u.id_geocoding IS NULL")
 
     sql = f"""
         SELECT DISTINCT
