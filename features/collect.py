@@ -88,18 +88,8 @@ def resolve_location(query: str) -> list[int]:
             f"(e.g. a country name or district)."
         )
 
-    # show what was found and ask user to pick
-    conn2 = _db_connect()
-    cur2 = conn2.cursor()
-    cur2.execute(
-        "SELECT DISTINCT country, first_level, second_level FROM geocoding_info "
-        "WHERE id_geocoding = ANY(%s) AND lang = 0",
-        (list(partial),)
-    )
-    suggestions = ", ".join(
-        f"{r[0]}/{r[1]}/{r[2]}" for r in cur2.fetchall()[:8]
-    )
-    conn2.close()
+    matched = [(c, f, s) for gid, c, f, s in rows if gid in partial]
+    suggestions = ", ".join(f"{c}/{f}/{s}" for c, f, s in matched[:8])
     raise ValueError(f"Partial match for '{query}': {suggestions} — be more specific.")
 
 
@@ -108,8 +98,7 @@ def query_items(
     geocoding_ids: list[int] = [],
     from_ts: int | None = None,
     to_ts: int | None = None,
-    item_type: int | None = None,        # single type (CLI convenience)
-    item_types: list[int] = [],          # multiple types (web UI)
+    item_types: list[int] = [],
     all_persons: bool = False,
     country: str | None = None,          # filter by country name
     district: str | None = None,         # filter by district/second_level name
@@ -182,13 +171,10 @@ def query_items(
         conditions.append("u.takentime <= %s")
         params.append(to_ts)
 
-    # --- Item type (single or multiple) ---
-    effective_types = list(item_types)
-    if item_type is not None and item_type not in effective_types:
-        effective_types.append(item_type)
-    if effective_types:
+    # --- Item type ---
+    if item_types:
         conditions.append("u.item_type = ANY(%s)")
-        params.append(effective_types)
+        params.append(item_types)
 
     # --- AI concepts ---
     if concepts:
@@ -247,9 +233,11 @@ def query_items(
         LEFT JOIN metadata m         ON m.id_unit = u.id
         WHERE {' AND '.join(conditions)}
         ORDER BY u.takentime
-        {'LIMIT ' + str(limit) if limit else ''}
+        {'LIMIT %s' if limit else ''}
     """
 
+    if limit:
+        params.append(limit)
     cur.execute(sql, params)
     cols = [d[0] for d in cur.description]
     seen = set()
@@ -371,7 +359,7 @@ def collect(
         geocoding_ids=geocoding_ids,
         from_ts=from_ts,
         to_ts=to_ts,
-        item_type=item_type_int,
+        item_types=[item_type_int] if item_type_int is not None else [],
         all_persons=all_persons,
         limit=limit,
     )

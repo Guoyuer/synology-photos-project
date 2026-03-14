@@ -9,7 +9,7 @@ import psycopg2
 import psycopg2.extras
 import requests
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -204,7 +204,6 @@ def thumbnail(item_id: int, size: str = "sm"):
     row = cur.fetchone()
     conn.close()
     if not row:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Item not found")
     cache_key = row["cache_key"]
 
