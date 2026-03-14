@@ -77,23 +77,90 @@ def _cached_ref(key: str, sql: str) -> list:
 
 
 _photos_session = None
+_session_validated_at = 0.0
+_SESSION_CHECK_INTERVAL = 300  # re-validate every 5 minutes
+
+
+def _fresh_login():
+    """Perform a fresh Synology login, returning the Photos API object."""
+    from session_manager import get_photos_api
+    photos, _ = get_photos_api(
+        nas_ip=os.getenv("NAS_IP"),
+        nas_port=os.getenv("NAS_PORT"),
+        nas_username=os.getenv("NAS_USERNAME"),
+        nas_password=os.getenv("NAS_PASSWORD"),
+        nas_secure=os.getenv("NAS_SECURE", "False").lower() == "true",
+        nas_cert_verify=os.getenv("NAS_CERT_VERIFY", "False").lower() == "true",
+        nas_dsm_version=int(os.getenv("NAS_DSM_VERSION", "7")),
+        use_cache=True,
+    )
+    return photos
+
+
+def _invalidate_session():
+    """Clear all cached session state so next get_session() does a fresh login."""
+    global _photos_session, _session_validated_at
+    _photos_session = None
+    _session_validated_at = 0.0
+    from session_manager import clear_session
+    clear_session()
+    from synology_api import base_api
+    base_api.BaseApi.shared_session = None
 
 
 def get_session():
-    global _photos_session
-    if _photos_session is None:
-        from session_manager import get_photos_api
-        _photos_session, _ = get_photos_api(
-            nas_ip=os.getenv("NAS_IP"),
-            nas_port=os.getenv("NAS_PORT"),
-            nas_username=os.getenv("NAS_USERNAME"),
-            nas_password=os.getenv("NAS_PASSWORD"),
-            nas_secure=os.getenv("NAS_SECURE", "False").lower() == "true",
-            nas_cert_verify=os.getenv("NAS_CERT_VERIFY", "False").lower() == "true",
-            nas_dsm_version=int(os.getenv("NAS_DSM_VERSION", "7")),
-            use_cache=True,
-        )
+    """Get a validated Synology Photos session, re-logging if stale."""
+    global _photos_session, _session_validated_at
+    now = time.monotonic()
+
+    # Fast path: recently validated
+    if _photos_session is not None and (now - _session_validated_at) < _SESSION_CHECK_INTERVAL:
+        return _photos_session
+
+    # Periodic validation: check the session is still good
+    if _photos_session is not None:
+        try:
+            result = _photos_session.get_userinfo()
+            if result.get('success'):
+                _session_validated_at = now
+                return _photos_session
+        except Exception:
+            pass
+        _invalidate_session()
+
+    # Fresh login
+    _photos_session = _fresh_login()
+    _session_validated_at = now
     return _photos_session
+
+
+def _is_syno_error(resp) -> bool:
+    """Check if a Synology HTTP response indicates a session/auth error."""
+    ct = resp.headers.get("Content-Type", "")
+    if "json" in ct:
+        try:
+            body = resp.json()
+            return not body.get("success", True)
+        except Exception:
+            pass
+    return False
+
+
+def _syno_request(build_request):
+    """Make a Synology API request with automatic session retry.
+
+    *build_request* is called with the Photos session and must return a
+    ``requests.Response``.  If Synology replies with a JSON error (stale
+    session), the session is refreshed and the request is retried once.
+    """
+    for attempt in range(2):
+        photos = get_session()
+        resp = build_request(photos)
+        if attempt == 0 and _is_syno_error(resp):
+            resp.close()
+            _invalidate_session()
+            continue
+        return resp
 
 
 # ---------------------------------------------------------------------------
@@ -224,25 +291,22 @@ class DownloadRequest(BaseModel):
 
 @app.post("/api/download")
 def download_files(req: DownloadRequest):
-    photos = get_session()
-    url = photos.session._base_url + "entry.cgi"
-    data = {
-        "api": "SYNO.Foto.Download",
-        "method": "download",
-        "version": "2",
-        "item_id": json.dumps(req.item_ids),
-        "download_type": "source",
-        "force_download": "true",
-        "_sid": photos.session.sid,
-    }
-    resp = requests.post(
-        url,
+    resp = _syno_request(lambda photos: requests.post(
+        photos.session._base_url + "entry.cgi",
         params={"SynoToken": photos.session.syno_token},
-        data=data,
+        data={
+            "api": "SYNO.Foto.Download",
+            "method": "download",
+            "version": "2",
+            "item_id": json.dumps(req.item_ids),
+            "download_type": "source",
+            "force_download": "true",
+            "_sid": photos.session.sid,
+        },
         verify=photos.session._verify,
         stream=True,
         timeout=600,
-    )
+    ))
     content_type = resp.headers.get("Content-Type", "application/zip")
     disposition = resp.headers.get("Content-Disposition", "attachment; filename=photos.zip")
     return StreamingResponse(
@@ -257,13 +321,10 @@ def download_files(req: DownloadRequest):
 # ---------------------------------------------------------------------------
 
 def _filestation_get(folder_name: str, filename: str, stream: bool = False):
-    """Fetch a file via FileStation API. Returns a raw requests.Response."""
-    photos = get_session()
+    """Fetch a file via FileStation API with session retry. Returns a requests.Response."""
     fs_path = f"/home/Photos{folder_name}/{filename}"
-    # Use synology-api's request_data which handles _sid and auth token automatically.
-    # For streaming we fall back to raw requests since request_data doesn't support stream=True.
     if stream:
-        resp = requests.get(
+        return _syno_request(lambda photos: requests.get(
             photos.session._base_url + "entry.cgi",
             params={
                 "api": "SYNO.FileStation.Download",
@@ -277,9 +338,10 @@ def _filestation_get(folder_name: str, filename: str, stream: bool = False):
             verify=photos.session._verify,
             stream=True,
             timeout=300,
-        )
+        ))
     else:
-        resp = photos.request_data(
+        photos = get_session()
+        return photos.request_data(
             api_name="SYNO.FileStation.Download",
             api_path="entry.cgi",
             req_param={"method": "download", "version": "2",
@@ -287,7 +349,6 @@ def _filestation_get(folder_name: str, filename: str, stream: bool = False):
             method="get",
             response_json=False,
         )
-    return resp
 
 
 def _filestation_stream(folder_name: str, filename: str, content_type: str):
@@ -302,23 +363,7 @@ def _stream_motion_video(folder_name: str, filename: str):
     Scans incoming chunks for the last 'ftyp' box header, then pipes from that
     offset onward — avoids buffering the entire file in memory.
     """
-    photos = get_session()
-    fs_path = f"/home/Photos{folder_name}/{filename}"
-    resp = requests.get(
-        photos.session._base_url + "entry.cgi",
-        params={
-            "api": "SYNO.FileStation.Download",
-            "method": "download",
-            "version": "2",
-            "path": json.dumps([fs_path]),
-            "mode": "open",
-            "SynoToken": photos.session.syno_token,
-            "_sid": photos.session.sid,
-        },
-        verify=photos.session._verify,
-        stream=True,
-        timeout=300,
-    )
+    resp = _filestation_get(folder_name, filename, stream=True)
     buffer = b""
     found = False
     for chunk in resp.iter_content(65536):
@@ -367,10 +412,9 @@ def stream_media(item_id: int, as_video: bool = False):
             return StreamingResponse(_stream_motion_video(row["folder_name"], row["filename"]), media_type="video/mp4")
 
     # Default: stream source via SYNO.Foto.Download
-    photos = get_session()
-    url = photos.session._base_url + "entry.cgi"
-    resp = requests.post(
-        url,
+    content_type, _ = mimetypes.guess_type(row["filename"])
+    resp = _syno_request(lambda photos: requests.post(
+        photos.session._base_url + "entry.cgi",
         params={"SynoToken": photos.session.syno_token},
         data={
             "api": "SYNO.Foto.Download",
@@ -384,8 +428,7 @@ def stream_media(item_id: int, as_video: bool = False):
         verify=photos.session._verify,
         stream=True,
         timeout=300,
-    )
-    content_type, _ = mimetypes.guess_type(row["filename"])
+    ))
     return StreamingResponse(
         resp.iter_content(chunk_size=65536),
         media_type=content_type or "application/octet-stream",
@@ -455,20 +498,22 @@ def item_meta(item_id: int):
 @app.get("/api/thumbnail/{item_id}/{cache_key}")
 def thumbnail(item_id: int, cache_key: str, size: str = "sm"):
     size_map = {"sm": "sm", "md": "m", "lg": "xl"}
-    photos = get_session()
-    url = photos.session._base_url + "entry.cgi"
-    params = {
-        "api": "SYNO.Foto.Thumbnail",
-        "method": "get",
-        "version": "2",
-        "id": item_id,
-        "type": "unit",
-        "size": size_map.get(size, "sm"),
-        "cache_key": f"{item_id}_{cache_key}",
-        "SynoToken": photos.session.syno_token,
-        "_sid": photos.session.sid,
-    }
-    resp = requests.get(url, params=params, verify=photos.session._verify, timeout=15)
+    resp = _syno_request(lambda photos: requests.get(
+        photos.session._base_url + "entry.cgi",
+        params={
+            "api": "SYNO.Foto.Thumbnail",
+            "method": "get",
+            "version": "2",
+            "id": item_id,
+            "type": "unit",
+            "size": size_map.get(size, "sm"),
+            "cache_key": f"{item_id}_{cache_key}",
+            "SynoToken": photos.session.syno_token,
+            "_sid": photos.session.sid,
+        },
+        verify=photos.session._verify,
+        timeout=15,
+    ))
     content_type = resp.headers.get("Content-Type", "image/jpeg")
     if "text/html" in content_type:
         raise HTTPException(status_code=404, detail="Thumbnail not available")

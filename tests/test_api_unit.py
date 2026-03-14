@@ -493,3 +493,80 @@ class TestStreamMedia:
         with patch.object(main_mod, "db", return_value=_db_ctx(conn)):
             resp = client.get("/api/media/9999")
         assert resp.status_code == 404
+
+
+# ===========================================================================
+# Session auto-renewal
+# ===========================================================================
+
+class TestSessionAutoRenewal:
+    def _make_session(self):
+        sess = MagicMock()
+        sess.session._base_url  = "http://nas/"
+        sess.session.syno_token = "TOK"
+        sess.session.sid        = "SID"
+        sess.session._verify    = False
+        return sess
+
+    def test_thumbnail_retries_on_session_error(self, app_client):
+        """When Synology returns a JSON error (stale session), thumbnail retries with fresh session."""
+        client, main_mod, _, _ = app_client
+
+        stale_resp = MagicMock()
+        stale_resp.headers = {"Content-Type": "application/json"}
+        stale_resp.json.return_value = {"success": False, "error": {"code": 119}}
+
+        good_resp = MagicMock()
+        good_resp.headers = {"Content-Type": "image/jpeg"}
+        good_resp.content = b"\xff\xd8\xff"
+
+        call_count = 0
+        def side_effect(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            return stale_resp if call_count == 1 else good_resp
+
+        sess = self._make_session()
+        with patch.object(main_mod, "get_session", return_value=sess), \
+             patch.object(main_mod, "_invalidate_session") as mock_inv, \
+             patch.object(main_mod.requests, "get", side_effect=side_effect):
+            resp = client.get("/api/thumbnail/7/CKEY42")
+
+        assert resp.status_code == 200
+        mock_inv.assert_called_once()
+
+    def test_thumbnail_no_retry_on_good_response(self, app_client):
+        """Normal image response should not trigger session invalidation."""
+        client, main_mod, _, _ = app_client
+        good_resp = MagicMock()
+        good_resp.headers = {"Content-Type": "image/jpeg"}
+        good_resp.content = b"\xff\xd8\xff"
+
+        sess = self._make_session()
+        with patch.object(main_mod, "get_session", return_value=sess), \
+             patch.object(main_mod, "_invalidate_session") as mock_inv, \
+             patch.object(main_mod.requests, "get", return_value=good_resp):
+            resp = client.get("/api/thumbnail/7/CKEY42")
+
+        assert resp.status_code == 200
+        mock_inv.assert_not_called()
+
+    def test_is_syno_error_detects_failure(self, app_client):
+        _, main_mod, _, _ = app_client
+        resp = MagicMock()
+        resp.headers = {"Content-Type": "application/json"}
+        resp.json.return_value = {"success": False, "error": {"code": 119}}
+        assert main_mod._is_syno_error(resp) is True
+
+    def test_is_syno_error_passes_success(self, app_client):
+        _, main_mod, _, _ = app_client
+        resp = MagicMock()
+        resp.headers = {"Content-Type": "application/json"}
+        resp.json.return_value = {"success": True}
+        assert main_mod._is_syno_error(resp) is False
+
+    def test_is_syno_error_passes_image(self, app_client):
+        _, main_mod, _, _ = app_client
+        resp = MagicMock()
+        resp.headers = {"Content-Type": "image/jpeg"}
+        assert main_mod._is_syno_error(resp) is False
