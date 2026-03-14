@@ -59,7 +59,7 @@ def list_person_photos(photos, person_id, limit=None):
     return True
 
 
-def download_person_photos(photos, person_id, output_dir="downloads", limit=None, nas_ip=None, nas_port=None, nas_secure=False, nas_cert_verify=False):
+def download_person_photos(photos, person_id, output_dir="downloads", limit=None):
     """
     Download all photos of a specific person.
 
@@ -68,10 +68,6 @@ def download_person_photos(photos, person_id, output_dir="downloads", limit=None
         person_id: Person ID to download photos for
         output_dir: Directory to save photos
         limit: Max number of photos to download
-        nas_ip: NAS IP address
-        nas_port: NAS port
-        nas_secure: Use HTTPS
-        nas_cert_verify: Verify SSL cert
     """
     print(f"\n=== Downloading Photos of Person {person_id} ===")
 
@@ -81,14 +77,8 @@ def download_person_photos(photos, person_id, output_dir="downloads", limit=None
         print("No photos found to download")
         return False
 
-    # Create output directory
     Path(output_dir).mkdir(exist_ok=True)
-
     print(f"Downloading {len(items)} photos to {output_dir}/\n")
-
-    # Get auth tokens from session
-    syno_token = photos.session.syno_token
-    sid = photos.session.sid
 
     success_count = 0
     failed_count = 0
@@ -97,18 +87,7 @@ def download_person_photos(photos, person_id, output_dir="downloads", limit=None
         filename = item.get('filename', 'Unknown')
         item_id = item.get('id')
 
-        # Download the photo
-        if download_item(
-            item_id=item_id,
-            filename=filename,
-            output_dir=output_dir,
-            syno_token=syno_token,
-            sid=sid,
-            nas_ip=nas_ip,
-            nas_port=nas_port,
-            nas_secure=nas_secure,
-            nas_cert_verify=nas_cert_verify
-        ):
+        if download_item(photos, item_id, filename, output_dir):
             print(f"  ✅ {i}/{len(items)} {filename}")
             success_count += 1
         else:
@@ -122,16 +101,12 @@ def download_person_photos(photos, person_id, output_dir="downloads", limit=None
     return success_count > 0
 
 
-def download_item(item_id, filename, output_dir, syno_token, sid, nas_ip, nas_port, nas_secure=False, nas_cert_verify=False):
+def download_item(photos, item_id, filename, output_dir):
     """Download a single original photo."""
     try:
-        protocol = "https" if nas_secure else "http"
-        url = f"{protocol}://{nas_ip}:{nas_port}/webapi/entry.cgi"
+        url = photos.session._base_url + 'entry.cgi'
 
-        # SynoToken in query string (CSRF token)
-        params = {'SynoToken': syno_token}
-
-        # Form data with _sid for authentication
+        params = {'SynoToken': photos.session.syno_token}
         data = {
             'api': 'SYNO.Foto.Download',
             'method': 'download',
@@ -139,14 +114,14 @@ def download_item(item_id, filename, output_dir, syno_token, sid, nas_ip, nas_po
             'item_id': json.dumps([item_id]),
             'download_type': 'source',
             'force_download': 'true',
-            '_sid': sid,
+            '_sid': photos.session.sid,
         }
 
         response = requests.post(
             url,
             params=params,
             data=data,
-            verify=nas_cert_verify,
+            verify=photos.session._verify,
             stream=True,
             timeout=60,
         )
