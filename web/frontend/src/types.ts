@@ -39,7 +39,6 @@ export interface MediaItem {
   country: string | null
   first_level: string | null
   district: string | null
-  camera: string | null
 }
 
 // Full metadata returned by /api/meta/{id} — used by MetaPanel

@@ -77,7 +77,7 @@ export function MetaPanel({ item, onClose }: Props) {
         <Section title="Photo">
           <Row label="Dimensions"   value={item.width && item.height ? `${item.width} × ${item.height}` : null} />
           <Row label="Orientation"  value={orientation} />
-          <Row label="Camera"       value={meta?.camera ?? item.camera} />
+          <Row label="Camera"       value={meta?.camera} />
           <Row label="Lens"         value={meta?.lens} />
           <Row label="Focal length" value={meta?.focal_length} />
           <Row label="Aperture"     value={meta?.aperture} />

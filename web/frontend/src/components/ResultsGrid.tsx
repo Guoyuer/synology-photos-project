@@ -228,8 +228,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
                 <th className="pb-2 pr-3">Date</th>
                 <th className="pb-2 pr-3">Size</th>
                 <th className="pb-2 pr-3">Res / Duration</th>
-                <th className="pb-2 pr-3">Location</th>
-                <th className="pb-2">Camera</th>
+                <th className="pb-2">Location</th>
               </tr>
             </thead>
             <tbody>
@@ -256,8 +255,7 @@ export function ResultsGrid({ items, totalMb, cart, cartIds, sortDesc, onSortTog
                       {item.vres_x ? `${item.vres_x}p` : item.width ? `${item.width}×${item.height}` : ''}
                       {item.duration ? ` · ${fmtDur(item.duration)}` : ''}
                     </td>
-                    <td className="py-2 pr-3 text-xs text-gray-400">{item.district ?? item.country ?? '—'}</td>
-                    <td className="py-2 text-xs text-gray-400 max-w-[120px] truncate">{item.camera ?? '—'}</td>
+                    <td className="py-2 text-xs text-gray-400">{item.district ?? item.country ?? '—'}</td>
                   </tr>
                 )
               })}

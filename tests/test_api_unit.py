@@ -240,7 +240,6 @@ class TestCollect:
         "fps": None,
         "country": "Singapore",
         "district": None,
-        "camera": "iPhone",
         "latitude": None,
         "longitude": None,
     }

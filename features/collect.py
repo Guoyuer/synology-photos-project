@@ -278,12 +278,10 @@ def query_items(
             (va.video_info->>'resolution_x')::int  AS vres_x,
             gi.country,
             gi.first_level,
-            gi.second_level AS district,
-            m.camera"""
+            gi.second_level AS district"""
     enrich_joins = """
         LEFT JOIN video_additional va ON va.id_unit = u.id
-        LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0
-        LEFT JOIN metadata m         ON m.id_unit = u.id"""
+        LEFT JOIN geocoding_info gi  ON gi.id_geocoding = u.id_geocoding AND gi.lang = 0"""
     order = f"ORDER BY u.takentime {'DESC' if sort_desc else 'ASC'}"
 
     if limit:

@@ -40,7 +40,6 @@ export function Lightbox({ item, items, onClose, onNav, onInfo }: Props) {
         <div className="text-sm text-gray-300 font-mono truncate max-w-lg">{item.filename}</div>
         <div className="flex items-center gap-4 text-xs text-gray-500 ml-4 shrink-0">
           {item.taken_iso && <span>{item.taken_iso.slice(0, 16).replace('T', ' ')}</span>}
-          {item.camera && <span>{item.camera}</span>}
           {item.vres_x ? <span>{item.vres_x}p</span> : item.width ? <span>{item.width}×{item.height}</span> : null}
           {item.duration && <span>{fmtDur(item.duration)}</span>}
           <span>{fmt(item.filesize)}</span>

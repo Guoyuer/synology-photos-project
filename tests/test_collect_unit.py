@@ -50,7 +50,7 @@ def _make_db(rows, description=None):
             ("id",), ("filename",), ("takentime",), ("item_type",),
             ("filesize",), ("duplicate_hash",), ("cache_key",),
             ("width",), ("height",), ("duration",), ("vres_x",),
-            ("country",), ("first_level",), ("district",), ("camera",),
+            ("country",), ("first_level",), ("district",),
         ]
 
     cur = MagicMock()
@@ -67,7 +67,7 @@ def _row_tuple(**kw):
         "id", "filename", "takentime", "item_type",
         "filesize", "duplicate_hash", "cache_key",
         "width", "height", "duration", "vres_x",
-        "country", "first_level", "district", "camera",
+        "country", "first_level", "district",
     ]
     return tuple(kw.get(c) for c in cols)
 
@@ -78,7 +78,7 @@ def _default_row(**overrides):
         "item_type": 0, "filesize": 1024, "duplicate_hash": None,
         "cache_key": "ck", "width": 1920, "height": 1080,
         "duration": None, "vres_x": None, "fps": None,
-        "country": "SG", "district": None, "camera": "iPhone",
+        "country": "SG", "district": None,
         "latitude": None, "longitude": None,
     }
     defaults.update(overrides)
