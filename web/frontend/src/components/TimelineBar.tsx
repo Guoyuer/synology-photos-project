@@ -1,35 +1,100 @@
 /**
  * TimelineBar — vertical histogram on the right side of the grid.
  *
- * Displays photo density over time as horizontal bars (time top→bottom,
- * bar width = count). Clicking a bin scrolls the grid to that period
- * and sets the date filter.
+ * Displays photo density over time as horizontal bars (newest at top,
+ * bar width = count). Supports drill-down: clicking a year/quarter
+ * zooms into months; clicking a month sets the date filter.
  */
-import { useMemo, useCallback } from 'react'
+import { useMemo, useCallback, useState } from 'react'
 import type { MediaItem } from '../types'
-import { computeBins, type Bin } from './timelineBins'
+import { computeBins, type Bin, type Granularity } from './timelineBins'
+
+interface DrillLevel {
+  gran: Granularity
+  filterRange: { from: string; to: string }
+  label: string // e.g. "2023" or "2023 Q2"
+}
 
 interface Props {
   items: MediaItem[]
   onDateFilter: (from: string, to: string) => void
   onScrollTo: (itemIndex: number) => void
+  fromDate?: string
+  toDate?: string
+  onClearDateFilter: () => void
 }
 
-export function TimelineBar({ items, onDateFilter, onScrollTo }: Props) {
-  const { bins, maxCount } = useMemo(() => computeBins(items), [items])
+export function TimelineBar({ items, onDateFilter, onScrollTo, fromDate, toDate, onClearDateFilter }: Props) {
+  const [drillStack, setDrillStack] = useState<DrillLevel[]>([])
+
+  const currentDrill = drillStack.length > 0 ? drillStack[drillStack.length - 1] : null
+
+  const { bins, maxCount, gran } = useMemo(() => {
+    if (currentDrill) {
+      return computeBins(items, currentDrill.gran, currentDrill.filterRange)
+    }
+    return computeBins(items)
+  }, [items, currentDrill])
 
   const handleClick = useCallback((bin: Bin) => {
-    onDateFilter(bin.fromDate, bin.toDate)
-    onScrollTo(bin._firstIndex)
-  }, [onDateFilter, onScrollTo])
+    if (gran === 'year') {
+      // Drill into months of that year
+      setDrillStack(prev => [...prev, {
+        gran: 'month',
+        filterRange: { from: bin.fromDate, to: bin.toDate },
+        label: bin.label,
+      }])
+    } else if (gran === 'quarter') {
+      // Drill into months of that quarter
+      setDrillStack(prev => [...prev, {
+        gran: 'month',
+        filterRange: { from: bin.fromDate, to: bin.toDate },
+        label: bin.label,
+      }])
+    } else {
+      // Month level — set date filter and scroll
+      onDateFilter(bin.fromDate, bin.toDate)
+      onScrollTo(bin._firstIndex)
+    }
+  }, [gran, onDateFilter, onScrollTo])
 
-  if (!bins.length) return null
+  const handleBack = useCallback(() => {
+    setDrillStack(prev => prev.slice(0, -1))
+  }, [])
 
-  const binH = Math.max(4, Math.min(32, Math.floor(600 / bins.length)))
+  const dateFilterActive = !!(fromDate || toDate)
+
+  if (!bins.length && !dateFilterActive && !currentDrill) return null
+
+  const binH = bins.length > 0 ? Math.max(4, Math.min(32, Math.floor(600 / bins.length))) : 0
 
   return (
     <div className="w-12 shrink-0 flex flex-col overflow-y-auto bg-gray-900 border-l border-gray-800 select-none"
       style={{ scrollbarWidth: 'none' }}>
+
+      {/* Clear date filter button */}
+      {dateFilterActive && (
+        <button
+          onClick={onClearDateFilter}
+          title="Clear date filter"
+          className="shrink-0 flex items-center justify-center h-6 text-[9px] text-red-400 hover:text-red-300 hover:bg-gray-800 border-b border-gray-800 transition-colors"
+        >
+          Clear
+        </button>
+      )}
+
+      {/* Back/up button when drilled down */}
+      {currentDrill && (
+        <button
+          onClick={handleBack}
+          title={`Back to ${drillStack.length > 1 ? drillStack[drillStack.length - 2].label : 'all'}`}
+          className="shrink-0 flex items-center justify-center h-6 text-[9px] text-blue-400 hover:text-blue-300 hover:bg-gray-800 border-b border-gray-800 transition-colors gap-0.5"
+        >
+          <span>{'<'}</span>
+          <span className="truncate">{currentDrill.label}</span>
+        </button>
+      )}
+
       {bins.map(bin => {
         const pct = bin.count / maxCount
         const opacity = 0.25 + pct * 0.75

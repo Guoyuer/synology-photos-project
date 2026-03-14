@@ -5,6 +5,8 @@
  * - Granularity auto-scaling by date span
  * - Bin key computation from ISO date strings
  * - Bin range/label generation
+ * - Reverse-chronological ordering (newest first)
+ * - Drill-down sub-binning with forceGranularity and filterRange
  * - No NaN or invalid labels
  */
 
@@ -92,18 +94,20 @@ describe('computeBins', () => {
     country: null, first_level: null, district: null,
   })
 
-  it('groups items into yearly bins for large span', () => {
+  it('groups items into yearly bins for large span (newest first)', () => {
     const items = [
       makeItem(1577836800, '2020-01-01T00:00:00'),  // 2020-01-01
       makeItem(1590969600, '2020-06-01T00:00:00'),  // 2020-06-01
-      makeItem(1704067200, '2024-01-01T00:00:00'),  // 2024-01-01  (>3yr span → yearly)
+      makeItem(1704067200, '2024-01-01T00:00:00'),  // 2024-01-01  (>3yr span -> yearly)
     ]
-    const { bins, maxCount } = computeBins(items)
+    const { bins, maxCount, gran } = computeBins(items)
+    expect(gran).toBe('year')
     expect(bins.length).toBeGreaterThanOrEqual(2)
-    expect(bins[0].label).toBe('2020')
-    expect(bins[0].count).toBe(2)
-    expect(bins.at(-1)!.label).toBe('2024')
-    expect(bins.at(-1)!.count).toBe(1)
+    // Newest first
+    expect(bins[0].label).toBe('2024')
+    expect(bins[0].count).toBe(1)
+    expect(bins.at(-1)!.label).toBe('2020')
+    expect(bins.at(-1)!.count).toBe(2)
     expect(maxCount).toBe(2)
   })
 
@@ -136,11 +140,66 @@ describe('computeBins', () => {
   it('stores firstIndex for each bin', () => {
     const items = [
       makeItem(1577836800, '2020-01-01T00:00:00'),  // 2020
-      makeItem(1704067200, '2024-01-01T00:00:00'),  // 2024  (>3yr → yearly)
+      makeItem(1704067200, '2024-01-01T00:00:00'),  // 2024  (>3yr -> yearly)
       makeItem(1704153600, '2024-01-02T00:00:00'),  // 2024
     ]
     const { bins } = computeBins(items)
-    expect(bins[0]._firstIndex).toBe(0) // first 2020 item
-    expect(bins.at(-1)!._firstIndex).toBe(1) // first 2024 item
+    // Newest first: 2024 is first bin, 2020 is last
+    expect(bins[0]._firstIndex).toBe(1) // first 2024 item
+    expect(bins.at(-1)!._firstIndex).toBe(0) // first 2020 item
+  })
+
+  it('returns bins in reverse-chronological order (newest first)', () => {
+    const items = [
+      makeItem(1577836800, '2020-01-01T00:00:00'),
+      makeItem(1640995200, '2022-01-01T00:00:00'),
+      makeItem(1704067200, '2024-01-01T00:00:00'),
+    ]
+    const { bins } = computeBins(items)
+    expect(bins[0].label).toBe('2024')
+    expect(bins[1].label).toBe('2022')
+    expect(bins[2].label).toBe('2020')
+  })
+
+  describe('drill-down with forceGranularity and filterRange', () => {
+    const items = [
+      makeItem(1577836800, '2020-01-15T00:00:00'),  // Jan 2020
+      makeItem(1583020800, '2020-03-01T00:00:00'),  // Mar 2020
+      makeItem(1590969600, '2020-06-01T00:00:00'),  // Jun 2020
+      makeItem(1704067200, '2024-01-01T00:00:00'),  // Jan 2024
+      makeItem(1709251200, '2024-03-01T00:00:00'),  // Mar 2024
+    ]
+
+    it('drills into monthly bins for a specific year', () => {
+      const { bins, gran } = computeBins(items, 'month', { from: '2020-01-01', to: '2020-12-31' })
+      expect(gran).toBe('month')
+      // Should only contain months from 2020
+      expect(bins.every(b => b.fromDate.startsWith('2020'))).toBe(true)
+      // Newest month first
+      expect(bins[0].label).toBe('Jun 20')
+      expect(bins.at(-1)!.label).toBe('Jan 20')
+    })
+
+    it('drills into monthly bins for a specific quarter', () => {
+      const { bins, gran } = computeBins(items, 'month', { from: '2020-01-01', to: '2020-03-31' })
+      expect(gran).toBe('month')
+      // Should contain Jan and Mar 2020
+      expect(bins.length).toBe(2)
+      expect(bins[0].label).toBe('Mar 20')
+      expect(bins[1].label).toBe('Jan 20')
+    })
+
+    it('returns empty bins when no items match filter range', () => {
+      const { bins } = computeBins(items, 'month', { from: '2021-01-01', to: '2021-12-31' })
+      expect(bins).toEqual([])
+    })
+
+    it('preserves original item indices for scrollTo', () => {
+      const { bins } = computeBins(items, 'month', { from: '2024-01-01', to: '2024-12-31' })
+      // Jan 2024 is at index 3 in original array
+      const janBin = bins.find(b => b.label === 'Jan 24')
+      expect(janBin).toBeDefined()
+      expect(janBin!._firstIndex).toBe(3)
+    })
   })
 })
